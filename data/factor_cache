@@ -1,0 +1,17 @@
+- name: seed_1
+  expression: RANK(CLOSE - OPEN)
+- name: seed_2
+  expression: DELTA(CLOSE, 3)
+- name: seed_3
+  expression: TS_MEAN(RET, 5)
+- name: seed_4
+  expression: RANK(TS_STDDEV(RET, 10))
+- name: seed_5
+  expression: RANK(CORREL(CLOSE, VOLUME, 5))
+- name: seed_6
+  expression: RANK(VWAP - CLOSE)
+- name: seed_7
+  expression: DELTA(RANK(CLOSE), 5)
+- name: seed_8
+  expression: RANK(Z_SCORE(CLOSE))
+

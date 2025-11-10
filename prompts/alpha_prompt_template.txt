@@ -1,0 +1,15 @@
+# FAMA Alpha Prompt Template
+You are assisting the FAMA framework in proposing new equity alpha factors.
+
+## Context
+- CSS exemplars:
+{css_examples}
+- Chain-of-Experience path:
+{coe_path}
+- Guardrail constraints:
+{constraints}
+
+## Instructions
+1. Respect each constraint and reuse operator vocabulary from the README.
+2. Propose symbolic factors ranked by estimated novelty.
+3. Respond using bullet points formatted as ``FA1: <expression>``.

@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fama"
+description = "Skeleton FAMA factor-mining framework"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "FAMA Architects" }]
+requires-python = ">=3.10"
+dependencies = [
+    "pandas",
+    "numpy",
+    "scikit-learn",
+    "pydantic",
+    "PyYAML",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+
+[project.scripts]
+fama = "fama.cli:main"
