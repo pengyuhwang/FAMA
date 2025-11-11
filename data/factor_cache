@@ -14,4 +14,43 @@
   expression: DELTA(RANK(CLOSE), 5)
 - name: seed_8
   expression: RANK(Z_SCORE(CLOSE))
-
+- name: alpha_9
+  expression: RANK(TS_MEAN(VOLUME, 10) - TS_MEAN(VOLUME, 5))
+- name: alpha_10
+  expression: DELTA(RANK(HIGH - LOW), 7)
+- name: alpha_11
+  expression: RANK(CORREL(RET, VWAP, 10))
+- name: alpha_12
+  expression: TS_MEAN(DELTA(CLOSE, 1), 5)
+- name: alpha_13
+  expression: RANK(TS_STDDEV(CLOSE - VWAP, 15))
+- name: alpha_14
+  expression: RANK(DELTA(VWAP, 3))
+- name: alpha_15
+  expression: RANK(TS_MEAN(HIGH - LOW, 10))
+- name: alpha_16
+  expression: DELTA(RANK(CORREL(CLOSE, VWAP, 7)), 3)
+- name: alpha_17
+  expression: RANK(TS_MEAN(RET * VOLUME, 5))
+- name: alpha_18
+  expression: RANK(TS_STDDEV(AMOUNT, 20))
+- name: alpha_19
+  expression: RANK(TS_MEAN(HIGH - CLOSE, 7))
+- name: alpha_20
+  expression: DELTA(RANK(CORREL(RET, VOLUME, 5)), 3)
+- name: alpha_21
+  expression: RANK(TS_STDDEV(HIGH - LOW, 20))
+- name: alpha_22
+  expression: RANK(DELTA(AMOUNT, 5))
+- name: alpha_23
+  expression: RANK(TS_MEAN(CLOSE - VWAP, 15))
+- name: alpha_24
+  expression: RANK(TS_MEAN(CLOSE - VWAP, 10))
+- name: alpha_25
+  expression: RANK(CORREL(RET, VOLUME, 10))
+- name: alpha_26
+  expression: RANK(DELTA(HIGH - LOW, 3))
+- name: alpha_27
+  expression: RANK(TS_MEAN(RET * (CLOSE - OPEN), 5))
+- name: alpha_28
+  expression: RANK(Z_SCORE(VWAP - OPEN))

@@ -1,8 +1,7 @@
 k: 12  # target number of clusters for CSS stage
-l: 24  # number of cross-sample selections per mining epoch
 u: 5   # minimum factor count required before CoE expansion
 css:
-  sample_count: 48
+  n_select: 5
   similarity_metric: "spearman"
 coe:
   max_depth: 8
@@ -12,17 +11,18 @@ run:
   use_css: true
   use_coe: true
 paths:
-  market_data: "./data/market.parquet"
+  market_data: "./data/fof_price_updating.parquet"
   factor_cache: "./data/factor_cache"
   prompts_dir: "./prompts"
   output_dir: "./artifacts"
 llm:
   provider: "openai"
-  model: "gpt-4.1"
-  temperature: 0.2
+  model: "gpt-4o"
+  temperature: 0
+  thinking: "medium"
   max_new_factors: 5
   instructions_path: "./prompts/alpha_prompt_template.txt"
-  api_key_env: "LLM_API_KEY"
+  api_key_env: LLM_API_KEY
 logging:
   level: "INFO"
   log_file: "./logs/fama.log"

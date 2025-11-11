@@ -6,6 +6,8 @@ You are assisting the FAMA framework in proposing new equity alpha factors.
 {css_examples}
 - Chain-of-Experience path:
 {coe_path}
+- Available fields (uppercase only):
+{available_fields}
 - Guardrail constraints:
 {constraints}
 

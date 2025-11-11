@@ -14,9 +14,11 @@ def test_build_prompt_signature(tmp_path):
         ["RANK(CLOSE)"],
         ["RANK(CLOSE)", "DELTA(CLOSE, 3)"],
         {"instructions_path": str(template_path), "max_new_factors": 3},
+        available_fields=["CLOSE", "RET"],
     )
     assert "RANK(CLOSE)" in prompt
     assert "max_new_factors" in prompt
+    assert "Available fields" in prompt
 
 
 def test_parse_llm_output_signature():

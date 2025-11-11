@@ -15,6 +15,7 @@ dependencies = [
     "scikit-learn",
     "pydantic",
     "PyYAML",
+    "pyarrow",
 ]
 
 [project.optional-dependencies]

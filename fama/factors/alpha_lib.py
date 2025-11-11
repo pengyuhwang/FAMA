@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import ast
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, Iterable, List
 
 import numpy as np
 import pandas as pd
@@ -60,7 +60,7 @@ def list_seed_alphas() -> list[str]:
     ]
 
 
-def validate_alpha_syntax(expr: str) -> bool:
+def validate_alpha_syntax(expr: str, allowed_variables: Iterable[str] | None = None) -> bool:
     """在表达式进入 CSS 前做轻量语法校验。
 
     Args:
@@ -69,6 +69,10 @@ def validate_alpha_syntax(expr: str) -> bool:
     Returns:
         布尔值，表示表达式是否只包含被支持的语法节点。
     """
+
+    allowed = set(_BASE_VARIABLES)
+    if allowed_variables:
+        allowed.update(var.upper() for var in allowed_variables)
 
     try:
         tree = ast.parse(expr, mode="eval")
@@ -79,7 +83,7 @@ def validate_alpha_syntax(expr: str) -> bool:
         if isinstance(node, (ast.Expression, ast.Load, ast.BinOp, ast.UnaryOp, ast.Call, ast.Num, ast.Constant)):
             continue
         if isinstance(node, ast.Name):
-            if node.id not in _ALLOWED_FUNCTIONS and node.id not in _ALLOWED_VARIABLES:
+            if node.id not in _ALLOWED_FUNCTIONS and node.id not in allowed:
                 return False
             continue
         if isinstance(node, (ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Pow, ast.USub, ast.UAdd)):
@@ -203,7 +207,7 @@ _ALLOWED_FUNCTIONS: Dict[str, Callable[..., Any]] = {
     "ABS": _abs,
 }
 
-_ALLOWED_VARIABLES = {
+_BASE_VARIABLES = {
     "OPEN",
     "HIGH",
     "LOW",

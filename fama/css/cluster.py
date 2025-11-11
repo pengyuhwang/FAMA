@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
-from typing import List
+from typing import List, Tuple
 
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 
 
-def cluster_factors_kmeans(factor_matrix: "np.ndarray", k: int) -> list[list[int]]:
+def cluster_factors_kmeans(
+    factor_matrix: "np.ndarray", k: int
+) -> tuple[list[list[int]], "np.ndarray", "np.ndarray"]:
     """使用 KMeans 对因子暴露做聚类（README “CSS Context Assembly”）。
 
     Args:
@@ -17,56 +19,82 @@ def cluster_factors_kmeans(factor_matrix: "np.ndarray", k: int) -> list[list[int
         k: 目标聚类数量，对应 defaults.yaml 中的 ``k``。
 
     Returns:
-        聚类结果，每个元素为索引列表。
+        (簇列表, 簇心, 标准化后的因子矩阵)。
     """
 
     if factor_matrix.size == 0:
-        return []
+        empty = np.zeros((0, 0))
+        return [], empty, empty
 
     safe_matrix = _prepare_matrix(factor_matrix)
     n_obs = safe_matrix.shape[1]
     n_clusters = max(1, min(k, n_obs))
     if n_clusters == 1 or n_obs == 1:
-        return [list(range(n_obs))]
+        clusters = [list(range(n_obs))]
+        centers = safe_matrix[:, :1].T if safe_matrix.size else np.zeros((1, safe_matrix.shape[0]))
+        return clusters, centers, safe_matrix
 
     model = KMeans(n_clusters=n_clusters, n_init=10, random_state=42)
     labels = model.fit_predict(safe_matrix.T)
-    clusters = [np.where(labels == idx)[0].tolist() for idx in range(n_clusters)]
-    return [cluster for cluster in clusters if cluster]
+    raw_clusters = [np.where(labels == idx)[0].tolist() for idx in range(n_clusters)]
+    clusters = [cluster for cluster in raw_clusters if cluster]
+    centers = []
+    for members in clusters:
+        cluster_matrix = safe_matrix[:, members]
+        centers.append(cluster_matrix.mean(axis=1))
+    centers_array = np.vstack(centers) if centers else np.zeros((0, safe_matrix.shape[0]))
+    centers = centers_array
+    return clusters, centers, safe_matrix
 
 
-def select_cross_samples(clusters: list[list[int]], l: int) -> list[int]:
-    """执行 SelectSamples 阶段，挑选多样化的因子索引。
+def select_cross_samples(
+    clusters: list[list[int]],
+    centers: "np.ndarray",
+    factor_matrix: "np.ndarray",
+    n_select: int,
+) -> list[int]:
+    """执行 SelectSamples 阶段，从每个簇挑选最靠近簇心的因子索引。
 
     Args:
-        clusters: :func:`cluster_factors_kmeans` 的输出。
-        l: defaults.yaml 中的 ``l`` 值。
+        clusters: :func:`cluster_factors_kmeans` 的簇集合。
+        centers: 对应簇心。
+        factor_matrix: 标准化后的因子矩阵。
+        n_select: 需要选择的因子数量（超参数 n）。
 
     Returns:
         传递给 CoE 的索引列表。
     """
 
-    if not clusters:
+    if not clusters or n_select <= 0:
         return []
 
-    desired = max(1, l)
+    n_clusters = len(clusters)
+    ordered_members: list[list[int]] = []
+    for cluster_idx, members in enumerate(clusters):
+        centroid = centers[cluster_idx]
+        ranked = sorted(
+            members,
+            key=lambda member: np.linalg.norm(factor_matrix[:, member] - centroid),
+        )
+        ordered_members.append(ranked)
+
     selections: list[int] = []
-    cluster_iter = 0
-    while len(selections) < desired:
-        cluster = clusters[cluster_iter % len(clusters)]
-        pick = cluster[len(selections) % len(cluster)]
-        selections.append(pick)
-        cluster_iter += 1
-        if len(selections) >= desired:
-            break
-    unique: list[int] = []
-    seen: set[int] = set()
-    for idx in selections:
-        if idx in seen:
+    exhausted = [False] * n_clusters
+    cursor = 0
+    while len(selections) < n_select and not all(exhausted):
+        cluster_idx = cursor % n_clusters
+        if not ordered_members[cluster_idx]:
+            exhausted[cluster_idx] = True
+            cursor += 1
             continue
-        seen.add(idx)
-        unique.append(idx)
-    return unique
+        candidate = ordered_members[cluster_idx].pop(0)
+        if not ordered_members[cluster_idx]:
+            exhausted[cluster_idx] = True
+        if candidate not in selections:
+            selections.append(candidate)
+        cursor += 1
+
+    return selections
 
 
 def _prepare_matrix(matrix: "np.ndarray") -> "np.ndarray":
