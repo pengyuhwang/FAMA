@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import ast
-from typing import Any, Callable, Dict, Iterable, List
+import importlib
+import re
+from typing import Any, Callable, Dict, Iterable, List, Optional
 
 import numpy as np
 import pandas as pd
+
+_ALPHA_TOKEN = re.compile(r"^alpha\d{3}$", re.IGNORECASE)
 
 
 def parse_symbolic_expression(expr: str) -> dict:
@@ -42,25 +46,40 @@ def parse_symbolic_expression(expr: str) -> dict:
 
 
 def list_seed_alphas() -> list[str]:
-    """返回 CSS 阶段所需的初始 Alpha 表达式。
+    """返回 CSS 阶段所需的初始 Alpha 表达式。"""
 
-    Returns:
-        可作为 CSS 初始化输入的一组表达式字符串。
-    """
-
-    return [
-        "RANK(CLOSE - OPEN)",
-        "DELTA(CLOSE, 3)",
-        "TS_MEAN(RET, 5)",
-        "RANK(TS_STDDEV(RET, 10))",
-        "RANK(CORREL(CLOSE, VOLUME, 5))",
-        "RANK(VWAP - CLOSE)",
-        "DELTA(RANK(CLOSE), 5)",
-        "RANK(Z_SCORE(CLOSE))",
-    ]
+    return _default_seed_expressions().copy()
 
 
-def validate_alpha_syntax(expr: str, allowed_variables: Iterable[str] | None = None) -> bool:
+_ALPHA101_CACHE: list[str] | None = None
+
+
+def list_alpha101_tokens() -> list[str]:
+    """从 KunQuant 内置的 Alpha101 模块列出可用的符号名称。"""
+
+    global _ALPHA101_CACHE
+    if _ALPHA101_CACHE is not None:
+        return _ALPHA101_CACHE.copy()
+    try:
+        module = importlib.import_module("KunQuant.predefined.Alpha101")
+    except Exception:
+        _ALPHA101_CACHE = []
+        return []
+
+    tokens: list[str] = []
+    for name, obj in vars(module).items():
+        if callable(obj) and _ALPHA_TOKEN.fullmatch(name.lower()):
+            tokens.append(name.lower())
+    _ALPHA101_CACHE = sorted(tokens)
+    return _ALPHA101_CACHE.copy()
+
+
+def validate_alpha_syntax(
+    expr: str,
+    allowed_variables: Iterable[str] | None = None,
+    *,
+    allowed_ops: Optional[Iterable[str]] = None,
+) -> bool:
     """在表达式进入 CSS 前做轻量语法校验。
 
     Args:
@@ -70,17 +89,25 @@ def validate_alpha_syntax(expr: str, allowed_variables: Iterable[str] | None = N
         布尔值，表示表达式是否只包含被支持的语法节点。
     """
 
+    stripped = expr.strip()
+    if _ALPHA_TOKEN.fullmatch(stripped):
+        return True
+
     allowed = set(_BASE_VARIABLES)
     if allowed_variables:
         allowed.update(var.upper() for var in allowed_variables)
+    allowed_ops_set = {op.upper() for op in allowed_ops} if allowed_ops else None
 
     try:
         tree = ast.parse(expr, mode="eval")
     except SyntaxError:
         return False
 
+    called_ops = set()
     for node in ast.walk(tree):
         if isinstance(node, (ast.Expression, ast.Load, ast.BinOp, ast.UnaryOp, ast.Call, ast.Num, ast.Constant)):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+                called_ops.add(node.func.id.upper())
             continue
         if isinstance(node, ast.Name):
             if node.id not in _ALLOWED_FUNCTIONS and node.id not in allowed:
@@ -89,6 +116,12 @@ def validate_alpha_syntax(expr: str, allowed_variables: Iterable[str] | None = N
         if isinstance(node, (ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Pow, ast.USub, ast.UAdd)):
             continue
         return False
+
+    if allowed_ops_set is not None:
+        unknown = called_ops - allowed_ops_set
+        if unknown:
+            return False
+
     return True
 
 
@@ -191,6 +224,7 @@ def _abs(series: "pd.Series") -> "pd.Series":
 __all__ = [
     "parse_symbolic_expression",
     "list_seed_alphas",
+    "list_alpha101_tokens",
     "validate_alpha_syntax",
     "evaluate_expression",
 ]
@@ -216,3 +250,37 @@ _BASE_VARIABLES = {
     "RET",
     "VWAP",
 }
+
+
+def _default_seed_expressions() -> list[str]:
+    base = [
+        "RANK(CLOSE - OPEN)",
+        "DELTA(CLOSE, 3)",
+        "TS_MEAN(RET, 5)",
+        "RANK(TS_STDDEV(RET, 10))",
+        "RANK(CORREL(CLOSE, VOLUME, 5))",
+        "RANK(VWAP - CLOSE)",
+        "DELTA(RANK(CLOSE), 5)",
+        "RANK(CLOSE)",
+        "RANK(CLOSE - LOW)",
+        "RANK(HIGH - CLOSE)",
+        "TS_STDDEV(CLOSE - OPEN, 7)",
+        "TS_MEAN(RET * VOLUME, 5)",
+        "RANK(CORREL(RET, VWAP, 10))",
+        "RANK(TS_STDDEV(VOLUME, 15))",
+        "DELTA(RANK(VOLUME), 4)",
+    ]
+    exprs = base.copy()
+    for w in range(3, 23):
+        exprs.append(f"RANK(TS_MEAN(CLOSE - OPEN, {w}))")
+    for lag in range(2, 22):
+        exprs.append(f"DELTA(RANK(CLOSE - LOW), {lag})")
+    for w in range(5, 25):
+        exprs.append(f"RANK(TS_STDDEV(VOLUME, {w}))")
+    for w in range(6, 26):
+        exprs.append(f"RANK(CORREL(CLOSE, VOLUME, {w}))")
+    for w in range(4, 14):
+        exprs.append(f"RANK(TS_MEAN(RET * VOLUME, {w}))")
+    for lag in range(3, 13):
+        exprs.append(f"RANK(DELTA(VWAP - CLOSE, {lag}))")
+    return exprs[:101]

@@ -32,10 +32,12 @@ def request_new_factors(
         model: 目标模型名称。
         api_key: API 密钥，缺失时将使用回退逻辑。
         temperature: 采样温度，会直接传递给 OpenAI 接口。
-        thinking: OpenAI reasoning/“thinking”力度设置，可为 ``"light"``、``"medium"`` 等。
+        thinking: reasoning/“thinking”力度设置。
+        allowed_fields: 允许引用的字段列表，用于 fallback 生成时保障安全。
+        logger: 可选日志记录器，用于输出原始响应。
 
     Returns:
-        LLM 返回的因子表达式列表；没有密钥或 SDK 不可用时使用伪造响应保持流程可执行。
+        因子表达式列表；没有密钥或 SDK 不可用时退回确定性样本。
     """
 
     if provider.lower() != "openai":

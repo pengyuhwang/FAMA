@@ -16,6 +16,9 @@ dependencies = [
     "pydantic",
     "PyYAML",
     "pyarrow",
+    "KunQuant>=0.3.0",
+    "cmake",
+    "ninja",
 ]
 
 [project.optional-dependencies]

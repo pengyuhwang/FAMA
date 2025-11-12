@@ -1,9 +1,11 @@
 k: 12  # target number of clusters for CSS stage
 u: 5   # minimum factor count required before CoE expansion
 css:
-  n_select: 5
+  n_select: 24
   similarity_metric: "spearman"
 coe:
+  mode: "cold_start"
+  cold_start_examples: []
   max_depth: 8
   min_edge_score: 0.15
   split_threshold: 0.4
@@ -13,6 +15,7 @@ run:
 paths:
   market_data: "./data/fof_price_updating.parquet"
   factor_cache: "./data/factor_cache"
+  factor_outputs: "./data/factor_values"
   prompts_dir: "./prompts"
   output_dir: "./artifacts"
 llm:
@@ -22,7 +25,13 @@ llm:
   thinking: "medium"
   max_new_factors: 5
   instructions_path: "./prompts/alpha_prompt_template.txt"
-  api_key_env: LLM_API_KEY
+  api_key_env: "LLM_API_KEY"
+  operator_whitelist: ["RANK","DELTA","TS_MEAN","TS_STDDEV","CORREL","Z_SCORE","SIGN","ABS"]
+  deny_fields: []
 logging:
   level: "INFO"
   log_file: "./logs/fama.log"
+compute:
+  use_kunquant: true
+  threads: 4
+  layout: "TS"

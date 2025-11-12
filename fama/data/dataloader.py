@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Any, Dict, Iterable, Optional, Sequence, Tuple
+
+import re
 
 import numpy as np
 import pandas as pd
@@ -11,8 +13,14 @@ from pandas.api import types as ptypes
 
 from fama.factors.alpha_lib import evaluate_expression, list_seed_alphas
 
+try:  # KunQuant 后端为可选依赖
+    from fama.data.kun_backend import compute_factor_values_kunquant
+except Exception:  # pragma: no cover
+    compute_factor_values_kunquant = None
+
 DATE_CANDIDATES = {"date", "trade_date", "calc_date", "datetime", "time"}
 SYMBOL_CANDIDATES = {"symbol", "ticker", "secid", "sec_code", "asset", "code", "unique_id"}
+_ALPHA_TOKEN = re.compile(r"^alpha\d{3}$", re.IGNORECASE)
 
 
 def load_market_data(path: str) -> "pd.DataFrame":
@@ -68,16 +76,80 @@ def compute_weighted_price(
     return vw_price.fillna(df[price_column])
 
 
-def compute_factor_values(df: "pd.DataFrame", formulas: list[str]) -> "pd.DataFrame":
-    """根据符号表达式生成因子矩阵。
+def compute_factor_values(
+    df: "pd.DataFrame",
+    formulas: list[str],
+    cfg: Optional[Dict[str, Any]] = None,
+) -> "pd.DataFrame":
+    """统一的因子计算入口（KunQuant 优先，Python 兜底）。"""
 
-    Args:
-        df: 满足 README “Data & Factor Inputs” 规范的行情数据。
-        formulas: 由编排器提供的符号表达式列表。
+    cfg = cfg or {}
+    compute_cfg = cfg.get("compute", {})
+    use_kunquant = bool(compute_cfg.get("use_kunquant", False))
+    alpha_exprs, python_exprs = _split_alpha_formulas(formulas)
+    logger = None
+    if alpha_exprs and (not use_kunquant or compute_factor_values_kunquant is None):
+        raise ValueError(
+            "检测到 Alpha101 因子，但 KunQuant 后端未启用。请在配置中将 compute.use_kunquant 设为 true。"
+        )
 
-    Returns:
-        行索引为 ``(date, symbol)``、列为每个表达式的 DataFrame。
-    """
+    frames: list[pd.DataFrame] = []
+    if use_kunquant and alpha_exprs and compute_factor_values_kunquant is not None:
+        try:
+            threads = int(compute_cfg.get("threads", 4))
+            layout = str(compute_cfg.get("layout", "TS"))
+            from fama.utils.logging import get_logger
+
+            logger = get_logger(__name__)
+            logger.info(
+                "Using KunQuant backend for %d alpha expressions (threads=%s, layout=%s).",
+                len(alpha_exprs),
+                threads,
+                layout,
+            )
+            kun_df, fallback = compute_factor_values_kunquant(
+                df,
+                alpha_exprs,
+                threads=threads,
+                layout=layout,
+            )
+            frames.append(kun_df)
+            if fallback:
+                logger.info("KunQuant skipped %d expressions; fallback to Python.", len(fallback))
+                python_exprs.extend(fallback)
+            alpha_exprs = []
+        except Exception as exc:  # pragma: no cover
+            from fama.utils.logging import get_logger
+
+            logger = get_logger(__name__)
+            logger.warning(
+                "KunQuant backend failed (%s); falling back to Python interpreter.", exc
+            )
+            python_exprs.extend(alpha_exprs)
+    else:
+        python_exprs.extend(alpha_exprs)
+
+    if python_exprs:
+        if logger is None and use_kunquant:
+            from fama.utils.logging import get_logger
+
+            logger = get_logger(__name__)
+        if logger is not None and python_exprs:
+            logger.info("Using Python interpreter for %d expressions.", len(python_exprs))
+        frames.append(_compute_factor_values_python(df, python_exprs))
+
+    if not frames:
+        empty = pd.DataFrame(index=df.index)
+        empty.index.names = ["date", "symbol"]
+        return empty
+
+    merged = pd.concat(frames, axis=1)
+    merged.index.names = ["date", "symbol"]
+    return merged.sort_index()
+
+
+def _compute_factor_values_python(df: "pd.DataFrame", formulas: list[str]) -> "pd.DataFrame":
+    """原有的纯 Python/NumPy 解释器实现。"""
 
     if not formulas:
         formulas = list_seed_alphas()
@@ -93,6 +165,18 @@ def compute_factor_values(df: "pd.DataFrame", formulas: list[str]) -> "pd.DataFr
 
     factor_df = pd.DataFrame(factor_columns).sort_index().fillna(0.0)
     return factor_df
+
+
+def _split_alpha_formulas(formulas: list[str]) -> Tuple[list[str], list[str]]:
+    alpha_exprs: list[str] = []
+    python_exprs: list[str] = []
+    for formula in formulas:
+        token = formula.strip()
+        if _ALPHA_TOKEN.fullmatch(token):
+            alpha_exprs.append(token.lower())
+        else:
+            python_exprs.append(formula)
+    return alpha_exprs, python_exprs
 
 
 def zscore_normalize(s: "pd.Series") -> "pd.Series":

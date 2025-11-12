@@ -4,16 +4,15 @@ A Python 3.10 scaffold for **single-run** factor discovery that mirrors the Fact
 
 1. **Cross-Sample Selection (CSS)** – cluster existing factors (low correlation) and surface diverse exemplars.
 2. **Chain-of-Experience (CoE)** – maintain experience chains that LLM prompts can extend or split.
-3. **Prompt Builder + LLM Client** – render a configurable template, then invoke your preferred provider. A deterministic fallback keeps the pipeline executable until you wire a real API.
+3. **Prompt Builder + LLM Client** – build an operator-card-driven prompt and call OpenAI (or a deterministic fallback) under strict field/operator constraints.
 
-When `paths.market_data` points to `data/fof_price_updating.parquet`, the orchestrator loads your production dataset (requires `pyarrow` or `fastparquet`). If the file is missing, synthetic OHLCV data is generated so the stack still runs end-to-end.
+When `paths.market_data` points to `data/fof_price_updating.parquet`, the orchestrator直接读取该 Parquet（自动识别 `time`、`unique_id` 等列），否则退回到内置的 OHLCV 模拟器。
 
 ## Quickstart
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -e .
-# 若需读取 Parquet，请确保安装 pyarrow（已在依赖中）
-# pip install pyarrow
+pip install -r requirements.txt  # KunQuant / JIT 工具链
 python -m fama.cli mine --config fama/config/defaults.yaml
 python -m fama.cli mine --config fama/config/defaults.yaml --skip-css   # CoE only
 python -m fama.cli mine --config fama/config/defaults.yaml --skip-coe   # CSS only
@@ -23,7 +22,7 @@ The CLI prints newly generated expressions. Pass `--output ./artifacts/run.yaml`
 ## Architecture
 | Stage | Location | Description |
 | ----- | -------- | ----------- |
-| Data Simulation | `fama/data/dataloader.py` | `load_market_data` reads the Parquet dataset (or falls back to a simulator) and enforces a `(date, symbol)` MultiIndex. `available_factor_inputs` enumerates columns you are allowed to reference, and `compute_factor_values` evaluates expressions safely. |
+| Data / Compute | `fama/data/dataloader.py`, `fama/data/kun_backend.py` | `load_market_data` 规整 `(date, symbol)` MultiIndex；`available_factor_inputs` 抽取可用字段；`compute_factor_values` 优先走 KunQuant（TS 布局、多线程执行），KunQuant 失败或关闭时回退到 Python 解释器。 |
 | CSS | `fama/css/cluster.py` | `cluster_factors_kmeans` (KMeans clustering) + `select_cross_samples` (pick the factor closest to each cluster centroid). Hyperparameters `k` and `css.n_select` control the number of clusters and the count of chosen representatives. Inputs are normalized via `fama/factors/transforms.py`. |
 | CoE | `fama/coe/chain.py` | `build_initial_coe`, `match_coe`, and `extend_or_split_coe` manage experience chains using heuristic scores derived from factor magnitudes. |
 | Prompting | `fama/mining/prompt_builder.py` | Reads `prompts/alpha_prompt_template.txt`, fills placeholders `{css_examples}`, `{coe_path}`, `{constraints}`, and parses LLM responses. |
@@ -33,45 +32,34 @@ The CLI prints newly generated expressions. Pass `--output ./artifacts/run.yaml`
 | Persistence | `fama/data/factor_space.py`, `fama/utils/io.py` | FactorSet serialized to YAML (`paths.factor_cache`). Config/outputs also rely on YAML helpers. |
 
 ## Data & Factors
-- **Production Parquet**: Place `fof_price_updating.parquet` under `data/`. The loader automatically maps date columns such as `time` and symbol identifiers such as `unique_id`, inspects every numeric column, builds `(date, symbol)` indices, and exposes the resulting uppercase column list to both prompts and validators. Install `pyarrow` (already listed in `pyproject.toml`) to unlock Parquet support.
-- **Synthetic OHLCV**: Automatically generated when the configured file is missing—useful for unit tests or demos.
-- **Derived Series**: When `close`/`volume` exist, the loader adds `RET` (per-symbol returns) and `VWAP` (volume-weighted price) to the expression context.
-- **Expression DSL**: Supported functions include `RANK`, `DELTA`, `TS_MEAN`, `TS_STDDEV`, `CORREL`, `Z_SCORE`, `SIGN`, `ABS`. Variables are restricted to the dataset columns (uppercased) plus `RET`/`VWAP`, so the LLM cannot reference unavailable metrics.
-- **Seed Library**: `list_seed_alphas` is filtered against the allowed field list. If nothing survives (e.g., new dataset without OHLC), simple rank-based seeds are synthesized from the detected columns.
+- **Production Parquet**：`data/fof_price_updating.parquet`（或自定义路径）会被自动映射成 `(date, symbol)` MultiIndex；若文件缺失，则退回到内置的 OHLCV 模拟器。`pyarrow` 已列在依赖里。
+- **Derived Series**：当 `close`/`volume` 存在时自动注入 `RET`、`VWAP`；字段可通过 `llm.deny_fields` 做黑名单控制。
+- **KunQuant Backend**：`fama/data/kun_backend.py` 将 `(T,N)` 布局输入喂给 KunQuant JIT，批量执行 Alpha；`compute.use_kunquant=false` 时自动回退到 Python 解释器。
+- **Expression DSL / Operators**：白名单覆盖 `RANK/DELTA/TS_MEAN/TS_STDDEV/CORREL/Z_SCORE/SIGN/ABS`，并由语义卡片 + 解析层双重限制，确保 LLM 不会输出未知算子或字段。
+- **Seed Library**：项目随发行同步解析 KunQuant `predefined.Alpha101` 中可用的符号（当前 82 条，`alpha001`~`alpha101` 之间的子集），并写入 FactorCache；这些表达式运行时直接走 KunQuant 预置实现。
 
 ## Prompt & LLM Integration
-1. Populate `.env` from `.env.example` (default key: `LLM_API_KEY` or override via `llm.api_key_env`).
-2. Customize `prompts/alpha_prompt_template.txt` or supply another template via `llm.instructions_path`.
-3. `PromptOrchestrator.build_prompt` collects:
-   - CSS exemplars (if enabled) joined as bullet points.
-   - CoE path (if enabled) as an ordered chain.
-   - Constraints payload (`llm.*` config minus `instructions_path`).
-4. `fama/mining/llm_client.py` uses the official `openai` SDK (`client = OpenAI(...); client.responses.create(**payload)`) with `model`, `temperature`, `reasoning/effort`, and `prompt` arguments. When the API key is missing, a deterministic fallback emits expressions built *only* from the allowed fields.
-
-### Example Template Snippet
-```text
-# FAMA Alpha Prompt Template
-- CSS exemplars:
-{css_examples}
-- Chain-of-Experience path:
-{coe_path}
-- Available fields (uppercase only):
-{available_fields}
-- Guardrail constraints:
-{constraints}
-```
+1. Populate `.env` from `.env.example`（或设置 `llm.api_key_env` 对应的变量）。
+2. `prompt_builder.build_prompt` 会自动：
+   - 抽取 CSS/CoE 中出现的算子，并与 `llm.operator_whitelist` 取交集；
+   - 渲染 Operator Cards，生成 checksum，并要求 LLM 在首行输出 `OPS-CHECKSUM: xxx`；
+   - 注入允许字段列表（`available_fields - deny_fields`），并加上“只用这些字段/算子、输出 N 条”等 Guardrail。
+3. 解析阶段再次使用同一白名单和字段集合做语法校验，违规表达式会被丢弃。
+4. `fama/mining/llm_client.py` 使用官方 `OpenAI` Chat Completions (`client = OpenAI(...); client.chat.completions.create(...)`)，终端会打印原始输出；若缺少 API Key，则返回受限于字段白名单的确定性伪造结果。
 
 ## Configuration Cheatsheet (`fama/config/defaults.yaml`)
 | Key | Meaning |
 | --- | ------- |
-| `k`, `css.n_select`, `u` | CSS cluster count, number of centroid-nearest representatives per run, CoE split threshold guard. |
-| `css.*`, `coe.*` | Extra knobs controlling sample counts, depth, edge thresholds. |
-| `run.use_css`, `run.use_coe` | Defaults when CLI flags are omitted. |
-| `paths.market_data` | CSV/Parquet path; triggers simulator if missing. |
-| `paths.factor_cache` | File (or directory) storing serialized FactorSets. |
-| `paths.prompts_dir` | Used by prompt builder to find templates. |
-| `paths.output_dir` | Where CLI writes YAML results when `--output` is provided. |
-| `llm.*` | Provider, model, temperature, max factors, template path, env var name. |
+| `k`, `css.n_select`, `u` | CSS 聚类数、每轮保留的簇心代表数、CoE 拆分阈值。 |
+| `css.*`, `coe.*` | 其他 CSS/CoE 超参。 |
+| `run.use_css`, `run.use_coe` | CLI 未显式指定时的默认开关。 |
+| `paths.market_data` | CSV/Parquet 路径；缺失时回退到模拟数据。 |
+| `paths.factor_cache` | 初始 FactorSet YAML（启动时解析 KunQuant Alpha101 预置表达式并写入）。 |
+| `paths.factor_outputs` | 计算后的因子值保存目录（每个表达式单独一个文件）。 |
+| `paths.prompts_dir` / `paths.output_dir` | 模板/产物路径。 |
+| `llm.*` | Provider、模型、温度、reasoning、算子白名单、字段黑名单、API key 等。 |
+| `compute.use_kunquant` | 是否启用 KunQuant 后端；关闭则强制使用 Python 解释器。 |
+| `compute.threads` / `compute.layout` | KunQuant 执行器线程数、输入/输出布局（默认 TS）。 |
 
 ## Extending the Scaffold
 - **Real Data**: Drop your OHLCV dataset, ensure it has `date` & `symbol` columns, and update `paths.market_data`.

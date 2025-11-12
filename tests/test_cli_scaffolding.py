@@ -19,7 +19,10 @@ def test_cli_subcommand_handlers_exist(tmp_path, monkeypatch, capsys):
 
     config = read_yaml("fama/config/defaults.yaml")
     config["paths"]["market_data"] = str(tmp_path / "market.parquet")
-    config["paths"]["factor_cache"] = str(tmp_path / "factors.yaml")
+    factor_path = tmp_path / "factors.yaml"
+    write_yaml(str(factor_path), [{"name": "seed_1", "expression": "RANK(CLOSE)"}])
+    config["paths"]["factor_cache"] = str(factor_path)
+    config.setdefault("compute", {})["use_kunquant"] = False
     config_path = tmp_path / "config.yaml"
     write_yaml(str(config_path), config)
 

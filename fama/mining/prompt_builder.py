@@ -2,57 +2,66 @@
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
-from typing import Dict, List
+import hashlib
+import re
+from typing import Iterable, List
 
-DEFAULT_TEMPLATE = """# FAMA Alpha Prompt
-CSS exemplars:
-{css_examples}
-Chain-of-Experience:
-{coe_path}
-Available fields:
-{available_fields}
-Constraints:
-{constraints}
-"""
+from fama.factors.opcards import render_cards
+
+OPS_REGEX = re.compile(r"\b(RANK|DELTA|TS_MEAN|TS_STDDEV|CORREL|Z_SCORE|SIGN|ABS)\b")
+
+
+def _extract_ops(exprs: Iterable[str]) -> list[str]:
+    ops: set[str] = set()
+    for expr in exprs:
+        for match in OPS_REGEX.finditer(str(expr)):
+            ops.add(match.group(1))
+    return sorted(ops)
+
+
+def _checksum(text: str) -> str:
+    return hashlib.md5(text.encode("utf-8")).hexdigest()[:8]
 
 
 def build_prompt(
     css_examples: list[str],
     coe_path: list[str],
     constraints: dict,
-    available_fields: list[str] | None = None,
+    *,
+    available_fields: list[str],
 ) -> str:
-    """拼装 LLM 挖掘阶段所需的结构化提示词。
+    """拼装 LLM 挖掘阶段所需的结构化提示词。"""
 
-    Args:
-        css_examples: CSS 挑选出的示例。
-        coe_path: 当前经验链路径。
-        constraints: 配置表中定义的各种约束。
-        available_fields: 允许 LLM 使用的字段列表。
+    whitelist = set(constraints.get("operator_whitelist", []))
+    context_ops = _extract_ops(list(css_examples) + list(coe_path))
+    ops = sorted((set(context_ops) & whitelist) if whitelist else set(context_ops))
+    cards = render_cards(ops)
+    checksum = _checksum(cards)
+    css_block = "\n".join(f"- {expr}" for expr in css_examples) or "- (none)"
+    coe_block = "\n".join(f"- {entry}" for entry in coe_path) or "- (none)"
+    fields_block = ", ".join(available_fields)
+    max_new = constraints.get("max_new_factors", 5)
 
-    Returns:
-        可直接发送给 LLM 的提示词文本。
-    """
+    prompt = f"""
+OPS-CHECKSUM: {checksum}
+仅可使用 Operator Specification 中列出的算子，且窗口参数需为正整数。禁止输出任何未列出的算子。
 
-    template_path = constraints.get("instructions_path")
-    template = DEFAULT_TEMPLATE
-    if template_path:
-        path = Path(template_path)
-        if path.exists():
-            template = path.read_text(encoding="utf-8")
-    css_block = "\n".join(f"- {expr}" for expr in css_examples) if css_examples else "- N/A"
-    coe_block = " -> ".join(coe_path) if coe_path else "N/A"
-    fields_block = ", ".join(available_fields) if available_fields else "N/A"
-    constraint_payload = {k: v for k, v in constraints.items() if k != "instructions_path"}
-    constraints_block = json.dumps(constraint_payload, ensure_ascii=False, indent=2)
-    return template.format(
-        css_examples=css_block,
-        coe_path=coe_block,
-        available_fields=fields_block,
-        constraints=constraints_block,
-    )
+{cards or '(no operators detected—fallback to whitelist)'}
+
+# CSS exemplars
+{css_block}
+
+# Chain-of-Experience (ICL hints)
+{coe_block}
+
+# Guardrails
+- 输出数量：{max_new} 条，一行一个表达式，纯文本、勿加反引号。
+- 仅允许使用以下字段（大写）：{fields_block}
+- 严格使用上述算子；未知算子视为违规。
+- 表达式长度 <= 80 字符，嵌套层级 <= 2。
+""".strip()
+
+    return prompt
 
 
 def parse_llm_output(text: str) -> list[str]:

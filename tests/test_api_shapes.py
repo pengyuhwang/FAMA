@@ -33,7 +33,10 @@ def test_prompt_orchestrator_run_signature(tmp_path):
 
     config = read_yaml("fama/config/defaults.yaml")
     config["paths"]["market_data"] = str(tmp_path / "market.parquet")
-    config["paths"]["factor_cache"] = str(tmp_path / "factors.yaml")
+    factor_path = tmp_path / "factors.yaml"
+    serialize_factor_set(FactorSet([Factor(name="seed_1", expression="RANK(CLOSE)")]), str(factor_path))
+    config["paths"]["factor_cache"] = str(factor_path)
+    config.setdefault("compute", {})["use_kunquant"] = False
     orchestrator = PromptOrchestrator(config)
     expressions = orchestrator.run(use_css=True, use_coe=True)
     assert expressions, "At least one factor should be generated."

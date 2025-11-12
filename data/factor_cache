@@ -1,56 +1,214 @@
-- name: seed_1
-  expression: RANK(CLOSE - OPEN)
-- name: seed_2
-  expression: DELTA(CLOSE, 3)
-- name: seed_3
-  expression: TS_MEAN(RET, 5)
-- name: seed_4
-  expression: RANK(TS_STDDEV(RET, 10))
-- name: seed_5
-  expression: RANK(CORREL(CLOSE, VOLUME, 5))
-- name: seed_6
-  expression: RANK(VWAP - CLOSE)
-- name: seed_7
-  expression: DELTA(RANK(CLOSE), 5)
-- name: seed_8
-  expression: RANK(Z_SCORE(CLOSE))
-- name: alpha_9
-  expression: RANK(TS_MEAN(VOLUME, 10) - TS_MEAN(VOLUME, 5))
-- name: alpha_10
-  expression: DELTA(RANK(HIGH - LOW), 7)
-- name: alpha_11
-  expression: RANK(CORREL(RET, VWAP, 10))
-- name: alpha_12
-  expression: TS_MEAN(DELTA(CLOSE, 1), 5)
-- name: alpha_13
-  expression: RANK(TS_STDDEV(CLOSE - VWAP, 15))
-- name: alpha_14
-  expression: RANK(DELTA(VWAP, 3))
-- name: alpha_15
-  expression: RANK(TS_MEAN(HIGH - LOW, 10))
-- name: alpha_16
-  expression: DELTA(RANK(CORREL(CLOSE, VWAP, 7)), 3)
-- name: alpha_17
-  expression: RANK(TS_MEAN(RET * VOLUME, 5))
-- name: alpha_18
-  expression: RANK(TS_STDDEV(AMOUNT, 20))
-- name: alpha_19
-  expression: RANK(TS_MEAN(HIGH - CLOSE, 7))
-- name: alpha_20
-  expression: DELTA(RANK(CORREL(RET, VOLUME, 5)), 3)
-- name: alpha_21
-  expression: RANK(TS_STDDEV(HIGH - LOW, 20))
-- name: alpha_22
-  expression: RANK(DELTA(AMOUNT, 5))
-- name: alpha_23
-  expression: RANK(TS_MEAN(CLOSE - VWAP, 15))
-- name: alpha_24
-  expression: RANK(TS_MEAN(CLOSE - VWAP, 10))
-- name: alpha_25
-  expression: RANK(CORREL(RET, VOLUME, 10))
-- name: alpha_26
-  expression: RANK(DELTA(HIGH - LOW, 3))
-- name: alpha_27
-  expression: RANK(TS_MEAN(RET * (CLOSE - OPEN), 5))
-- name: alpha_28
-  expression: RANK(Z_SCORE(VWAP - OPEN))
+- name: alpha001
+  expression: alpha001
+- name: alpha002
+  expression: alpha002
+- name: alpha003
+  expression: alpha003
+- name: alpha004
+  expression: alpha004
+- name: alpha005
+  expression: alpha005
+- name: alpha006
+  expression: alpha006
+- name: alpha007
+  expression: alpha007
+- name: alpha008
+  expression: alpha008
+- name: alpha009
+  expression: alpha009
+- name: alpha010
+  expression: alpha010
+- name: alpha011
+  expression: alpha011
+- name: alpha012
+  expression: alpha012
+- name: alpha013
+  expression: alpha013
+- name: alpha014
+  expression: alpha014
+- name: alpha015
+  expression: alpha015
+- name: alpha016
+  expression: alpha016
+- name: alpha017
+  expression: alpha017
+- name: alpha018
+  expression: alpha018
+- name: alpha019
+  expression: alpha019
+- name: alpha020
+  expression: alpha020
+- name: alpha021
+  expression: alpha021
+- name: alpha022
+  expression: alpha022
+- name: alpha023
+  expression: alpha023
+- name: alpha024
+  expression: alpha024
+- name: alpha025
+  expression: alpha025
+- name: alpha026
+  expression: alpha026
+- name: alpha027
+  expression: alpha027
+- name: alpha028
+  expression: alpha028
+- name: alpha029
+  expression: alpha029
+- name: alpha030
+  expression: alpha030
+- name: alpha031
+  expression: alpha031
+- name: alpha032
+  expression: alpha032
+- name: alpha033
+  expression: alpha033
+- name: alpha034
+  expression: alpha034
+- name: alpha035
+  expression: alpha035
+- name: alpha036
+  expression: alpha036
+- name: alpha037
+  expression: alpha037
+- name: alpha038
+  expression: alpha038
+- name: alpha039
+  expression: alpha039
+- name: alpha040
+  expression: alpha040
+- name: alpha041
+  expression: alpha041
+- name: alpha042
+  expression: alpha042
+- name: alpha043
+  expression: alpha043
+- name: alpha044
+  expression: alpha044
+- name: alpha045
+  expression: alpha045
+- name: alpha046
+  expression: alpha046
+- name: alpha047
+  expression: alpha047
+- name: alpha049
+  expression: alpha049
+- name: alpha050
+  expression: alpha050
+- name: alpha051
+  expression: alpha051
+- name: alpha052
+  expression: alpha052
+- name: alpha053
+  expression: alpha053
+- name: alpha054
+  expression: alpha054
+- name: alpha055
+  expression: alpha055
+- name: alpha057
+  expression: alpha057
+- name: alpha060
+  expression: alpha060
+- name: alpha061
+  expression: alpha061
+- name: alpha062
+  expression: alpha062
+- name: alpha064
+  expression: alpha064
+- name: alpha065
+  expression: alpha065
+- name: alpha066
+  expression: alpha066
+- name: alpha068
+  expression: alpha068
+- name: alpha071
+  expression: alpha071
+- name: alpha072
+  expression: alpha072
+- name: alpha073
+  expression: alpha073
+- name: alpha074
+  expression: alpha074
+- name: alpha075
+  expression: alpha075
+- name: alpha077
+  expression: alpha077
+- name: alpha078
+  expression: alpha078
+- name: alpha081
+  expression: alpha081
+- name: alpha083
+  expression: alpha083
+- name: alpha084
+  expression: alpha084
+- name: alpha085
+  expression: alpha085
+- name: alpha086
+  expression: alpha086
+- name: alpha088
+  expression: alpha088
+- name: alpha092
+  expression: alpha092
+- name: alpha094
+  expression: alpha094
+- name: alpha095
+  expression: alpha095
+- name: alpha096
+  expression: alpha096
+- name: alpha098
+  expression: alpha098
+- name: alpha099
+  expression: alpha099
+- name: alpha101
+  expression: alpha101
+- name: alpha_83
+  expression: RANK(TS_MEAN(RET, 5)) - RANK(TS_MEAN(RET, 20))
+- name: alpha_84
+  expression: DELTA(RANK(VOLUME), 3) * SIGN(CLOSE - OPEN)
+- name: alpha_85
+  expression: SIGN(DELTA(RANK(CLOSE), 5)) * RANK(TS_STDDEV(RET, 10))
+- name: alpha_86
+  expression: DELTA(RANK(CORREL(CLOSE, VOLUME, 10)), 3)
+- name: alpha_87
+  expression: RANK(VWAP - CLOSE) * TS_MEAN(RET * VOLUME, 5)
+- name: alpha_88
+  expression: RANK(TS_MEAN(RET, 5)) - RANK(TS_MEAN(RET, 20))
+- name: alpha_89
+  expression: DELTA(RANK(VOLUME), 3) * SIGN(CLOSE - OPEN)
+- name: alpha_90
+  expression: RANK(TS_STDDEV(RET, 10)) * SIGN(DELTA(RANK(CLOSE), 5))
+- name: alpha_91
+  expression: DELTA(RANK(CORREL(CLOSE, VOLUME, 10)), 3)
+- name: alpha_92
+  expression: RANK(VWAP - CLOSE) * TS_MEAN(RET * VOLUME, 5)
+- name: alpha_93
+  expression: RANK(TS_MEAN(RET, 5)) - RANK(TS_MEAN(RET, 20))
+- name: alpha_94
+  expression: SIGN(DELTA(RANK(CLOSE), 5)) * RANK(TS_STDDEV(RET, 10))
+- name: alpha_95
+  expression: DELTA(RANK(CORREL(CLOSE, VOLUME, 10)), 3)
+- name: alpha_96
+  expression: RANK(TS_MEAN(RET * VOLUME, 5)) - RANK(VWAP - CLOSE)
+- name: alpha_97
+  expression: DELTA(RANK(VOLUME), 3) * SIGN(RANK(CLOSE - OPEN))
+- name: alpha_98
+  expression: RANK(TS_MEAN(RET, 5)) - RANK(TS_MEAN(RET, 20))
+- name: alpha_99
+  expression: SIGN(DELTA(RANK(CLOSE), 5)) * RANK(TS_STDDEV(RET, 10))
+- name: alpha_100
+  expression: DELTA(RANK(CORREL(CLOSE, VOLUME, 10)), 3)
+- name: alpha_101
+  expression: RANK(TS_MEAN(RET * VOLUME, 5)) - RANK(VWAP - CLOSE)
+- name: alpha_102
+  expression: SIGN(DELTA(RANK(VOLUME), 3)) * RANK(CLOSE - OPEN)
+- name: alpha_103
+  expression: RANK(TS_MEAN(RET, 5)) - RANK(TS_MEAN(RET, 20))
+- name: alpha_104
+  expression: DELTA(RANK(CORREL(CLOSE, VOLUME, 10)), 3)
+- name: alpha_105
+  expression: SIGN(DELTA(RANK(CLOSE), 5)) * RANK(TS_STDDEV(RET, 10))
+- name: alpha_106
+  expression: RANK(TS_MEAN(RET * VOLUME, 5)) - RANK(TS_MEAN(RET, 20))
+- name: alpha_107
+  expression: DELTA(RANK(VOLUME), 3) * SIGN(DELTA(RANK(CLOSE - OPEN), 5))

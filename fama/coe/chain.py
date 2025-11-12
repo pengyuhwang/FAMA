@@ -3,10 +3,20 @@
 from __future__ import annotations
 
 import math
+from typing import Iterable, List
 
 import pandas as pd
 
 from fama.data.factor_space import FactorSet
+
+# 经典量化挖掘启发式，用于 CoE 冷启动阶段的提示词（ICL hints）。
+DEFAULT_COLD_START_HINTS: list[str] = [
+    "Momentum cascade: contrast RANK(TS_MEAN(RET, 5)) with RANK(TS_MEAN(RET, 20)) to locate names where fast momentum outruns medium trends.",
+    "Volume-confirmed breakout: require DELTA(RANK(VOLUME), 3) to align with RANK(CLOSE - OPEN) before trusting price momentum.",
+    "Volatility mean-reversion: fade extremes when RANK(TS_STDDEV(RET, 10)) spikes but SIGN(DELTA(RANK(CLOSE), 5)) flips.",
+    "Price-volume correlation drift: monitor DELTA(RANK(CORREL(CLOSE, VOLUME, 10)), 3) to spot regime shifts in demand/supply.",
+    "Liquidity-adjusted relative value: combine RANK(VWAP - CLOSE) with TS_MEAN(RET * VOLUME, 5) to emphasize institutional flow imbalances.",
+]
 
 
 def build_initial_coe(factors: "FactorSet", scores: "pd.Series" | None = None) -> list[list[str]]:
@@ -101,3 +111,27 @@ def _tokenize(expr: str) -> set[str]:
         .replace("/", " ")
     )
     return {token.upper() for token in cleaned.split() if token}
+
+
+def build_cold_start_hints(extra: Iterable[str] | None = None) -> list[str]:
+    """Assemble cold-start hints for the CoE section when no empirical chain exists."""
+
+    hints = DEFAULT_COLD_START_HINTS.copy()
+    if not extra:
+        return hints
+    for item in extra:
+        if not isinstance(item, str):
+            continue
+        stripped = item.strip()
+        if stripped:
+            hints.append(stripped)
+    return hints
+
+
+__all__ = [
+    "DEFAULT_COLD_START_HINTS",
+    "build_initial_coe",
+    "match_coe",
+    "extend_or_split_coe",
+    "build_cold_start_hints",
+]

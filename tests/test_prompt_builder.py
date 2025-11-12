@@ -9,16 +9,16 @@ def test_build_prompt_signature(tmp_path):
     """提示词构建器应正确替换 CSS/CoE 内容。"""
 
     template_path = tmp_path / "template.txt"
-    template_path.write_text("CSS:\n{css_examples}\nCoE:{coe_path}\nConstraints:{constraints}\n", encoding="utf-8")
+    template_path.write_text("placeholder", encoding="utf-8")
     prompt = prompt_builder.build_prompt(
         ["RANK(CLOSE)"],
         ["RANK(CLOSE)", "DELTA(CLOSE, 3)"],
-        {"instructions_path": str(template_path), "max_new_factors": 3},
+        {"instructions_path": str(template_path), "max_new_factors": 3, "operator_whitelist": ["RANK", "DELTA"], "deny_fields": []},
         available_fields=["CLOSE", "RET"],
     )
+    assert "OPS-CHECKSUM" in prompt
     assert "RANK(CLOSE)" in prompt
-    assert "max_new_factors" in prompt
-    assert "Available fields" in prompt
+    assert "仅允许使用以下字段" in prompt
 
 
 def test_parse_llm_output_signature():
