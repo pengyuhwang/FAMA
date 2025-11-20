@@ -8,21 +8,51 @@ from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
+import warnings
 from KunQuant.Driver import KunCompilerConfig
 from KunQuant.Op import Builder, ConstantOp, Input, Output, Rank
 from KunQuant.Stage import Function
 from KunQuant.jit import cfake
-from KunQuant.ops.CompOp import WindowedAvg, WindowedCorrelation, WindowedStddev
-from KunQuant.ops.ElewiseOp import (Abs as OpAbs, AddConst, Div as OpDiv, Mul as OpMul,
-                                    Sign as OpSign, Sub as OpSub)
+from KunQuant.ops.CompOp import (
+    DecayLinear,
+    TsArgMax,
+    TsArgMin,
+    TsRank,
+    WindowedAvg,
+    WindowedCorrelation,
+    WindowedCovariance,
+    WindowedMax,
+    WindowedMin,
+    WindowedProduct,
+    WindowedStddev,
+    WindowedSum,
+)
+from KunQuant.ops.ElewiseOp import (
+    Abs as OpAbs,
+    AddConst,
+    And as OpAnd,
+    Div as OpDiv,
+    Equals as OpEquals,
+    Exp as OpExp,
+    GreaterEqual as OpGreaterEqual,
+    GreaterThan as OpGreaterThan,
+    LessEqual as OpLessEqual,
+    LessThan as OpLessThan,
+    Log as OpLog,
+    Max as OpMax,
+    Min as OpMin,
+    Mul as OpMul,
+    Not as OpNot,
+    Or as OpOr,
+    Select,
+    SetInfOrNanToValue,
+    Sign as OpSign,
+    Sub as OpSub,
+)
 from KunQuant.ops.MiscOp import BackRef
+from KunQuant.Op import Scale
 from KunQuant.runner import KunRunner as kr
 
-
-try:
-    from KunQuant.predefined import Alpha101 as alpha101_module
-except Exception:  # pragma: no cover
-    alpha101_module = None
 
 FIELD_MAP: Dict[str, str] = {
     "OPEN": "open",
@@ -34,19 +64,82 @@ FIELD_MAP: Dict[str, str] = {
 }
 
 DSL_FUNCTIONS = {}
-_ALPHA_TOKEN = re.compile(r"^alpha\d{3}$", re.IGNORECASE)
 
 
 def _register_ops():
+    def _ensure_expression(value):
+        if isinstance(value, (int, float)):
+            return ConstantOp(float(value))
+        return value
+
+    def _mask_to_float(mask):
+        return Select(mask, ConstantOp(1.0), ConstantOp(0.0))
+
+    def _to_bool_float(value):
+        expr = _ensure_expression(value)
+        return _mask_to_float(OpGreaterThan(expr, ConstantOp(0.5)))
+
+    def _if_then_else(cond, a, b):
+        cond_float = _to_bool_float(cond)
+        a_expr = _ensure_expression(a)
+        b_expr = _ensure_expression(b)
+        return cond_float * a_expr + (ConstantOp(1.0) - cond_float) * b_expr
+
+    def _logical_and(x, y):
+        return _to_bool_float(x) * _to_bool_float(y)
+
+    def _logical_or(x, y):
+        bx = _to_bool_float(x)
+        by = _to_bool_float(y)
+        return bx + by - bx * by
+
+    def _logical_not(x):
+        return ConstantOp(1.0) - _to_bool_float(x)
+
     DSL_FUNCTIONS.update(
         {
             "RANK": lambda x: Rank(x),
-            "DELTA": lambda x, n: OpSub(x, BackRef(x, int(n))),
-            "TS_MEAN": lambda x, n: WindowedAvg(x, int(n)),
-            "TS_STDDEV": lambda x, n: WindowedStddev(x, int(n)),
-            "CORREL": lambda x, y, n: WindowedCorrelation(x, int(n), y),
+            "DELTA": lambda x, n: OpSub(x, BackRef(x, _to_int(n))),
+            "TS_MEAN": lambda x, n: WindowedAvg(x, _to_int(n)),
+            "TS_STDDEV": lambda x, n: WindowedStddev(x, _to_int(n)),
+            "CORREL": lambda x, y, n: WindowedCorrelation(x, _to_int(n), y),
             "SIGN": lambda x: OpSign(x),
             "ABS": lambda x: OpAbs(x),
+            "DELAY": lambda x, n: BackRef(x, _to_int(n)),
+            "TS_SUM": lambda x, n: WindowedSum(x, _to_int(n)),
+            "TS_MIN": lambda x, n: WindowedMin(x, _to_int(n)),
+            "TS_MAX": lambda x, n: WindowedMax(x, _to_int(n)),
+            "TS_PRODUCT": lambda x, n: WindowedProduct(x, _to_int(n)),
+            "TS_ARGMAX": lambda x, n: TsArgMax(x, _to_int(n)),
+            "TS_ARGMIN": lambda x, n: TsArgMin(x, _to_int(n)),
+            "TS_RANK": lambda x, n: TsRank(x, _to_int(n)),
+            "DECAY_LINEAR": lambda x, n: DecayLinear(x, _to_int(n)),
+            "SCALE": lambda x: Scale(x),
+            "IF": _if_then_else,
+            "AND": _logical_and,
+            "OR": _logical_or,
+            "NOT": _logical_not,
+            "GT": lambda x, y: _mask_to_float(
+                OpGreaterThan(_ensure_expression(x), _ensure_expression(y))
+            ),
+            "GE": lambda x, y: _mask_to_float(
+                OpGreaterEqual(_ensure_expression(x), _ensure_expression(y))
+            ),
+            "LT": lambda x, y: _mask_to_float(
+                OpLessThan(_ensure_expression(x), _ensure_expression(y))
+            ),
+            "LE": lambda x, y: _mask_to_float(
+                OpLessEqual(_ensure_expression(x), _ensure_expression(y))
+            ),
+            "EQ": lambda x, y: _mask_to_float(
+                OpEquals(_ensure_expression(x), _ensure_expression(y))
+            ),
+            "MAX": lambda x, y: OpMax(x, y),
+            "MIN": lambda x, y: OpMin(x, y),
+            "LOG": lambda x: OpLog(x),
+            "EXP": lambda x: OpExp(x),
+            "REPLACE_NAN_INF": lambda x, value=0.0: SetInfOrNanToValue(x, _to_float(value)),
+            "COVAR": lambda x, y, n: WindowedCovariance(x, _to_int(n), y),
         }
     )
 
@@ -134,7 +227,17 @@ def compute_factor_values_kunquant(
                 )
             matrix = raw.reshape(num_dates, num_symbols)
         df = pd.DataFrame(matrix, index=dates, columns=symbols)
-        stacked[expr] = df.stack(dropna=False)
+        try:
+            stacked_series = df.stack(future_stack=True)
+        except TypeError:
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    message="The previous implementation of stack is deprecated",
+                    category=FutureWarning,
+                )
+                stacked_series = df.stack(dropna=False)
+        stacked[expr] = stacked_series
 
     result = pd.concat(stacked, axis=1)
     result.index.names = ["date", "symbol"]
@@ -142,33 +245,8 @@ def compute_factor_values_kunquant(
 
 
 def _compile_expression(expr: str, env: Dict[str, Input]):
-    token = expr.strip().lower()
-    if _ALPHA_TOKEN.fullmatch(token):
-        return _compile_alpha_token(token, env)
     tree = ast.parse(expr, mode="eval")
     return _eval_ast(tree.body, env)
-
-
-def _compile_alpha_token(token: str, env: Dict[str, Input]):
-    if alpha101_module is None:
-        raise NotImplementedError("KunQuant Alpha101 模块不可用。")
-    builder_cls = getattr(alpha101_module, "AllData", None)
-    if builder_cls is None:
-        raise NotImplementedError("KunQuant Alpha101 缺少 AllData 定义。")
-    func = getattr(alpha101_module, token, None)
-    if func is None:
-        raise NotImplementedError(f"未知的 Alpha101 因子: {token}")
-
-    data = builder_cls(
-        open=env["OPEN"],
-        close=env.get("CLOSE"),
-        high=env.get("HIGH"),
-        low=env.get("LOW"),
-        volume=env.get("VOLUME"),
-        amount=env.get("AMOUNT"),
-        vwap=env.get("VWAP"),
-    )
-    return func(data)
 
 
 def _eval_ast(node: ast.AST, env: Dict[str, Input]):
@@ -211,6 +289,18 @@ def _eval_ast(node: ast.AST, env: Dict[str, Input]):
             return ConstantOp(float(value))
         raise NotImplementedError(f"Unsupported constant {value}")
     raise NotImplementedError(f"Unsupported AST node {ast.dump(node)}")
+
+
+def _to_int(value):
+    if isinstance(value, ConstantOp):
+        return int(value.attrs.get("value", 0))
+    return int(value)
+
+
+def _to_float(value):
+    if isinstance(value, ConstantOp):
+        return float(value.attrs.get("value", 0.0))
+    return float(value)
 
 
 def _build_ts_inputs(mkt_df: pd.DataFrame) -> Tuple[Dict[str, np.ndarray], List[pd.Timestamp], List[str]]:

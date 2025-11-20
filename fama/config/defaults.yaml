@@ -1,14 +1,16 @@
-k: 12  # target number of clusters for CSS stage
+k: 7  # target number of clusters for CSS stage
 u: 5   # minimum factor count required before CoE expansion
 css:
-  n_select: 24
+  n_select: 7
   similarity_metric: "spearman"
 coe:
-  mode: "cold_start"
-  cold_start_examples: []
-  max_depth: 8
-  min_edge_score: 0.15
-  split_threshold: 0.4
+  max_depth: 5
+  min_rankic: 0.05
+  prompt_chains: 3
+  benchmark_assets: ["000852.SH", "000905.SH"]
+  prompt_expr_chars: 0
+  ric_start_date: "2015-01-01"
+  ric_end_date: "2020-12-31"
 run:
   use_css: true
   use_coe: true
@@ -18,15 +20,48 @@ paths:
   factor_outputs: "./data/factor_values"
   prompts_dir: "./prompts"
   output_dir: "./artifacts"
+  factor_ric: "./factor_value_prepared/factor_ric.csv"
 llm:
   provider: "openai"
   model: "gpt-4o"
   temperature: 0
   thinking: "medium"
-  max_new_factors: 5
+  max_new_factors: 20
   instructions_path: "./prompts/alpha_prompt_template.txt"
   api_key_env: "LLM_API_KEY"
-  operator_whitelist: ["RANK","DELTA","TS_MEAN","TS_STDDEV","CORREL","Z_SCORE","SIGN","ABS"]
+  operator_whitelist:
+    [
+      "RANK",
+      "DELTA",
+      "DELAY",
+      "TS_MEAN",
+      "TS_SUM",
+      "TS_STDDEV",
+      "TS_MIN",
+      "TS_MAX",
+      "TS_PRODUCT",
+      "TS_ARGMAX",
+      "TS_ARGMIN",
+      "TS_RANK",
+      "CORREL",
+      "COVAR",
+      "Z_SCORE",
+      "SIGN",
+      "ABS",
+      "DECAY_LINEAR",
+      "SCALE",
+      "IF",
+      "GT",
+      "GE",
+      "LT",
+      "LE",
+      "EQ",
+      "MAX",
+      "MIN",
+      "LOG",
+      "EXP",
+      "REPLACE_NAN_INF",
+    ]
   deny_fields: []
 logging:
   level: "INFO"

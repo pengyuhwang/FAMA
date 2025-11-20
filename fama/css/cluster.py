@@ -49,52 +49,37 @@ def cluster_factors_kmeans(
 
 def select_cross_samples(
     clusters: list[list[int]],
-    centers: "np.ndarray",
-    factor_matrix: "np.ndarray",
     n_select: int,
+    *,
+    seed: int | None = None,
 ) -> list[int]:
-    """执行 SelectSamples 阶段，从每个簇挑选最靠近簇心的因子索引。
+    """执行论文中的随机化跨簇采样流程。
 
-    Args:
-        clusters: :func:`cluster_factors_kmeans` 的簇集合。
-        centers: 对应簇心。
-        factor_matrix: 标准化后的因子矩阵。
-        n_select: 需要选择的因子数量（超参数 n）。
-
-    Returns:
-        传递给 CoE 的索引列表。
+    先从每个簇随机抽取一个因子，得到组合 ``FC``；再从中随机挑选 ``l`` 个作为 CSS 上下文。
     """
 
     if not clusters or n_select <= 0:
         return []
 
-    n_clusters = len(clusters)
-    ordered_members: list[list[int]] = []
-    for cluster_idx, members in enumerate(clusters):
-        centroid = centers[cluster_idx]
-        ranked = sorted(
-            members,
-            key=lambda member: np.linalg.norm(factor_matrix[:, member] - centroid),
-        )
-        ordered_members.append(ranked)
-
-    selections: list[int] = []
-    exhausted = [False] * n_clusters
-    cursor = 0
-    while len(selections) < n_select and not all(exhausted):
-        cluster_idx = cursor % n_clusters
-        if not ordered_members[cluster_idx]:
-            exhausted[cluster_idx] = True
-            cursor += 1
+    rng = np.random.default_rng(seed)
+    factor_combo: list[int] = []
+    for members in clusters:
+        if not members:
             continue
-        candidate = ordered_members[cluster_idx].pop(0)
-        if not ordered_members[cluster_idx]:
-            exhausted[cluster_idx] = True
-        if candidate not in selections:
-            selections.append(candidate)
-        cursor += 1
+        idx = int(rng.integers(0, len(members)))
+        picked = members[idx]
+        if picked not in factor_combo:
+            factor_combo.append(picked)
 
-    return selections
+    if not factor_combo:
+        return []
+
+    l = min(n_select, len(factor_combo))
+    if l == len(factor_combo):
+        return factor_combo
+
+    selected_idx = rng.choice(len(factor_combo), size=l, replace=False)
+    return [factor_combo[int(i)] for i in selected_idx]
 
 
 def _prepare_matrix(matrix: "np.ndarray") -> "np.ndarray":

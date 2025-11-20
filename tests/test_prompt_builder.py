@@ -18,7 +18,7 @@ def test_build_prompt_signature(tmp_path):
     )
     assert "OPS-CHECKSUM" in prompt
     assert "RANK(CLOSE)" in prompt
-    assert "仅允许使用以下字段" in prompt
+    assert "JSON 数组" in prompt
 
 
 def test_parse_llm_output_signature():
@@ -26,4 +26,7 @@ def test_parse_llm_output_signature():
 
     text = "FA1: RANK(CLOSE)\nFA2: DELTA(CLOSE, 3)"
     expressions = prompt_builder.parse_llm_output(text)
-    assert expressions == ["RANK(CLOSE)", "DELTA(CLOSE, 3)"]
+    assert expressions == [
+        {"expression": "RANK(CLOSE)", "explanation": None},
+        {"expression": "DELTA(CLOSE, 3)", "explanation": None},
+    ]

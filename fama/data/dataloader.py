@@ -5,8 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional, Sequence, Tuple
 
-import re
-
 import numpy as np
 import pandas as pd
 from pandas.api import types as ptypes
@@ -20,7 +18,6 @@ except Exception:  # pragma: no cover
 
 DATE_CANDIDATES = {"date", "trade_date", "calc_date", "datetime", "time"}
 SYMBOL_CANDIDATES = {"symbol", "ticker", "secid", "sec_code", "asset", "code", "unique_id"}
-_ALPHA_TOKEN = re.compile(r"^alpha\d{3}$", re.IGNORECASE)
 
 
 def load_market_data(path: str) -> "pd.DataFrame":
@@ -86,15 +83,12 @@ def compute_factor_values(
     cfg = cfg or {}
     compute_cfg = cfg.get("compute", {})
     use_kunquant = bool(compute_cfg.get("use_kunquant", False))
-    alpha_exprs, python_exprs = _split_alpha_formulas(formulas)
+    formulas = formulas or list_seed_alphas()
+    python_exprs: list[str] = []
     logger = None
-    if alpha_exprs and (not use_kunquant or compute_factor_values_kunquant is None):
-        raise ValueError(
-            "检测到 Alpha101 因子，但 KunQuant 后端未启用。请在配置中将 compute.use_kunquant 设为 true。"
-        )
 
     frames: list[pd.DataFrame] = []
-    if use_kunquant and alpha_exprs and compute_factor_values_kunquant is not None:
+    if use_kunquant and compute_factor_values_kunquant is not None:
         try:
             threads = int(compute_cfg.get("threads", 4))
             layout = str(compute_cfg.get("layout", "TS"))
@@ -102,22 +96,21 @@ def compute_factor_values(
 
             logger = get_logger(__name__)
             logger.info(
-                "Using KunQuant backend for %d alpha expressions (threads=%s, layout=%s).",
-                len(alpha_exprs),
+                "Using KunQuant backend for %d expressions (threads=%s, layout=%s).",
+                len(formulas),
                 threads,
                 layout,
             )
             kun_df, fallback = compute_factor_values_kunquant(
                 df,
-                alpha_exprs,
+                formulas,
                 threads=threads,
                 layout=layout,
             )
             frames.append(kun_df)
             if fallback:
                 logger.info("KunQuant skipped %d expressions; fallback to Python.", len(fallback))
-                python_exprs.extend(fallback)
-            alpha_exprs = []
+            python_exprs = fallback
         except Exception as exc:  # pragma: no cover
             from fama.utils.logging import get_logger
 
@@ -125,9 +118,9 @@ def compute_factor_values(
             logger.warning(
                 "KunQuant backend failed (%s); falling back to Python interpreter.", exc
             )
-            python_exprs.extend(alpha_exprs)
+            python_exprs = formulas.copy()
     else:
-        python_exprs.extend(alpha_exprs)
+        python_exprs = formulas.copy()
 
     if python_exprs:
         if logger is None and use_kunquant:
@@ -165,18 +158,6 @@ def _compute_factor_values_python(df: "pd.DataFrame", formulas: list[str]) -> "p
 
     factor_df = pd.DataFrame(factor_columns).sort_index().fillna(0.0)
     return factor_df
-
-
-def _split_alpha_formulas(formulas: list[str]) -> Tuple[list[str], list[str]]:
-    alpha_exprs: list[str] = []
-    python_exprs: list[str] = []
-    for formula in formulas:
-        token = formula.strip()
-        if _ALPHA_TOKEN.fullmatch(token):
-            alpha_exprs.append(token.lower())
-        else:
-            python_exprs.append(formula)
-    return alpha_exprs, python_exprs
 
 
 def zscore_normalize(s: "pd.Series") -> "pd.Series":

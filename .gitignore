@@ -8,3 +8,9 @@ __pycache__/
 artifacts/
 logs/
 .DS_Store
+alphatest
+factor_correlation
+tmp
+
+factor_value_prepared/factor_values.csv
+data/data_test.ipynb

@@ -189,9 +189,19 @@ def _delta(series: "pd.Series", periods: int) -> "pd.Series":
     return series.groupby(level=1).diff(periods)
 
 
+def _delay(series: "pd.Series", periods: int) -> "pd.Series":
+    return series.groupby(level=1).shift(periods)
+
+
 def _ts_mean(series: "pd.Series", window: int) -> "pd.Series":
     return series.groupby(level=1, group_keys=False).apply(
         lambda s: s.rolling(window, min_periods=1).mean()
+    )
+
+
+def _ts_sum(series: "pd.Series", window: int) -> "pd.Series":
+    return series.groupby(level=1, group_keys=False).apply(
+        lambda s: s.rolling(window, min_periods=1).sum()
     )
 
 
@@ -201,10 +211,74 @@ def _ts_stddev(series: "pd.Series", window: int) -> "pd.Series":
     )
 
 
+def _ts_min(series: "pd.Series", window: int) -> "pd.Series":
+    return series.groupby(level=1, group_keys=False).apply(
+        lambda s: s.rolling(window, min_periods=1).min()
+    )
+
+
+def _ts_max(series: "pd.Series", window: int) -> "pd.Series":
+    return series.groupby(level=1, group_keys=False).apply(
+        lambda s: s.rolling(window, min_periods=1).max()
+    )
+
+
+def _ts_product(series: "pd.Series", window: int) -> "pd.Series":
+    def _product(values: np.ndarray) -> float:
+        if np.isnan(values).all():
+            return np.nan
+        return float(np.nanprod(values))
+
+    return series.groupby(level=1, group_keys=False).apply(
+        lambda s: s.rolling(window, min_periods=1).apply(_product, raw=True)
+    )
+
+
+def _ts_argmax(series: "pd.Series", window: int) -> "pd.Series":
+    def _argmax(values: np.ndarray) -> float:
+        if np.isnan(values).all():
+            return np.nan
+        return float(np.nanargmax(values))
+
+    return series.groupby(level=1, group_keys=False).apply(
+        lambda s: s.rolling(window, min_periods=1).apply(_argmax, raw=True)
+    )
+
+
+def _ts_argmin(series: "pd.Series", window: int) -> "pd.Series":
+    def _argmin(values: np.ndarray) -> float:
+        if np.isnan(values).all():
+            return np.nan
+        return float(np.nanargmin(values))
+
+    return series.groupby(level=1, group_keys=False).apply(
+        lambda s: s.rolling(window, min_periods=1).apply(_argmin, raw=True)
+    )
+
+
+def _ts_rank(series: "pd.Series", window: int) -> "pd.Series":
+    def _rank(values: "pd.Series") -> float:
+        last = values.iloc[-1]
+        if pd.isna(last):
+            return np.nan
+        ranks = values.rank(pct=True, method="average")
+        return float(ranks.iloc[-1])
+
+    return series.groupby(level=1, group_keys=False).apply(
+        lambda s: s.rolling(window, min_periods=1).apply(_rank, raw=False)
+    )
+
+
 def _correl(x: "pd.Series", y: "pd.Series", window: int) -> "pd.Series":
     joined = x.to_frame("x").join(y.to_frame("y"))
     grouped = joined.groupby(level=1, group_keys=False)
     return grouped.apply(lambda df: df["x"].rolling(window, min_periods=2).corr(df["y"]))
+
+
+def _covar(x: "pd.Series", y: "pd.Series", window: int) -> "pd.Series":
+    joined = x.to_frame("x").join(y.to_frame("y"))
+    grouped = joined.groupby(level=1, group_keys=False)
+    return grouped.apply(lambda df: df["x"].rolling(window, min_periods=2).cov(df["y"]))
 
 
 def _z_score(series: "pd.Series") -> "pd.Series":
@@ -221,6 +295,115 @@ def _abs(series: "pd.Series") -> "pd.Series":
     return series.abs()
 
 
+def _decay_linear(series: "pd.Series", window: int) -> "pd.Series":
+    weights = np.arange(1, window + 1, dtype=float)
+
+    def apply(values: np.ndarray) -> float:
+        valid = ~np.isnan(values)
+        if not valid.any():
+            return 0.0
+        w = weights[-len(values):][valid]
+        return float(np.dot(values[valid], w) / w.sum()) if w.sum() else 0.0
+
+    return series.groupby(level=1, group_keys=False).apply(
+        lambda s: s.rolling(window, min_periods=1).apply(apply, raw=True)
+    )
+
+
+def _scale(series: "pd.Series") -> "pd.Series":
+    grouped = series.groupby(level=0)
+    def normalize(s: "pd.Series") -> "pd.Series":
+        denom = s.abs().sum()
+        return s * 0 if denom == 0 else s / denom
+    return grouped.transform(normalize)
+
+
+def _broadcast_series(value: Any, index: "pd.Index") -> "pd.Series":
+    if isinstance(value, pd.Series):
+        return value.reindex(index)
+    return pd.Series(value, index=index)
+
+
+def _align_pair(left: Any, right: Any) -> tuple["pd.Series", "pd.Series"]:
+    if isinstance(left, pd.Series) and isinstance(right, pd.Series):
+        return left.align(right, join="outer")
+    if isinstance(left, pd.Series):
+        return left, _broadcast_series(right, left.index)
+    if isinstance(right, pd.Series):
+        return _broadcast_series(left, right.index), right
+    raise ValueError("At least one operand must be a pandas Series.")
+
+
+def _if(condition: "pd.Series", true_series: Any, false_series: Any) -> "pd.Series":
+    cond = condition.astype(bool)
+    index = cond.index
+    true_aligned = _broadcast_series(true_series, index)
+    false_aligned = _broadcast_series(false_series, index)
+    return true_aligned.where(cond, false_aligned)
+
+
+def _logical_and(left: Any, right: Any) -> "pd.Series":
+    aligned_left, aligned_right = _align_pair(left, right)
+    return (aligned_left.astype(bool) & aligned_right.astype(bool)).astype(float)
+
+
+def _logical_or(left: Any, right: Any) -> "pd.Series":
+    aligned_left, aligned_right = _align_pair(left, right)
+    return (aligned_left.astype(bool) | aligned_right.astype(bool)).astype(float)
+
+
+def _logical_not(series: Any) -> "pd.Series":
+    series = series if isinstance(series, pd.Series) else pd.Series(series)
+    return (~series.astype(bool)).astype(float)
+
+
+def _gt(left: Any, right: Any) -> "pd.Series":
+    aligned_left, aligned_right = _align_pair(left, right)
+    return (aligned_left > aligned_right).astype(float)
+
+
+def _ge(left: Any, right: Any) -> "pd.Series":
+    aligned_left, aligned_right = _align_pair(left, right)
+    return (aligned_left >= aligned_right).astype(float)
+
+
+def _lt(left: Any, right: Any) -> "pd.Series":
+    aligned_left, aligned_right = _align_pair(left, right)
+    return (aligned_left < aligned_right).astype(float)
+
+
+def _le(left: Any, right: Any) -> "pd.Series":
+    aligned_left, aligned_right = _align_pair(left, right)
+    return (aligned_left <= aligned_right).astype(float)
+
+
+def _eq(left: Any, right: Any) -> "pd.Series":
+    aligned_left, aligned_right = _align_pair(left, right)
+    return (aligned_left == aligned_right).astype(float)
+
+
+def _max_series(left: Any, right: Any) -> "pd.Series":
+    aligned_left, aligned_right = _align_pair(left, right)
+    return pd.concat([aligned_left, aligned_right], axis=1).max(axis=1)
+
+
+def _min_series(left: Any, right: Any) -> "pd.Series":
+    aligned_left, aligned_right = _align_pair(left, right)
+    return pd.concat([aligned_left, aligned_right], axis=1).min(axis=1)
+
+
+def _log(series: "pd.Series") -> "pd.Series":
+    return np.log(series.replace(0, np.nan))
+
+
+def _exp(series: "pd.Series") -> "pd.Series":
+    return np.exp(series)
+
+
+def _replace_nan_inf(series: "pd.Series", value: float = 0.0) -> "pd.Series":
+    return series.replace([np.inf, -np.inf], np.nan).fillna(value)
+
+
 __all__ = [
     "parse_symbolic_expression",
     "list_seed_alphas",
@@ -233,12 +416,37 @@ __all__ = [
 _ALLOWED_FUNCTIONS: Dict[str, Callable[..., Any]] = {
     "RANK": _rank,
     "DELTA": _delta,
+    "DELAY": _delay,
     "TS_MEAN": _ts_mean,
+    "TS_SUM": _ts_sum,
     "TS_STDDEV": _ts_stddev,
+    "TS_MIN": _ts_min,
+    "TS_MAX": _ts_max,
+    "TS_PRODUCT": _ts_product,
+    "TS_ARGMAX": _ts_argmax,
+    "TS_ARGMIN": _ts_argmin,
+    "TS_RANK": _ts_rank,
     "CORREL": _correl,
+    "COVAR": _covar,
     "Z_SCORE": _z_score,
     "SIGN": _sign,
     "ABS": _abs,
+    "DECAY_LINEAR": _decay_linear,
+    "SCALE": _scale,
+    "IF": _if,
+    "AND": _logical_and,
+    "OR": _logical_or,
+    "NOT": _logical_not,
+    "GT": _gt,
+    "GE": _ge,
+    "LT": _lt,
+    "LE": _le,
+    "EQ": _eq,
+    "MAX": _max_series,
+    "MIN": _min_series,
+    "LOG": _log,
+    "EXP": _exp,
+    "REPLACE_NAN_INF": _replace_nan_inf,
 }
 
 _BASE_VARIABLES = {

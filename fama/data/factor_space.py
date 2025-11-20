@@ -17,6 +17,7 @@ class Factor:
 
     name: str
     expression: str
+    explanation: str | None = None
 
 
 @dataclass
@@ -38,7 +39,7 @@ def serialize_factor_set(fs: "FactorSet", path: str) -> None:
     factor_path = Path(path)
     ensure_dir(str(factor_path.parent))
     with factor_path.open("w", encoding="utf-8") as handle:
-        yaml.safe_dump(payload, handle, sort_keys=False, allow_unicode=False)
+        yaml.safe_dump(payload, handle, sort_keys=False, allow_unicode=True)
 
 
 def deserialize_factor_set(path: str) -> "FactorSet":

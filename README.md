@@ -23,8 +23,8 @@ The CLI prints newly generated expressions. Pass `--output ./artifacts/run.yaml`
 | Stage | Location | Description |
 | ----- | -------- | ----------- |
 | Data / Compute | `fama/data/dataloader.py`, `fama/data/kun_backend.py` | `load_market_data` 规整 `(date, symbol)` MultiIndex；`available_factor_inputs` 抽取可用字段；`compute_factor_values` 优先走 KunQuant（TS 布局、多线程执行），KunQuant 失败或关闭时回退到 Python 解释器。 |
-| CSS | `fama/css/cluster.py` | `cluster_factors_kmeans` (KMeans clustering) + `select_cross_samples` (pick the factor closest to each cluster centroid). Hyperparameters `k` and `css.n_select` control the number of clusters and the count of chosen representatives. Inputs are normalized via `fama/factors/transforms.py`. |
-| CoE | `fama/coe/chain.py` | `build_initial_coe`, `match_coe`, and `extend_or_split_coe` manage experience chains using heuristic scores derived from factor magnitudes. |
+| CSS | `fama/css/cluster.py` | `cluster_factors_kmeans` (KMeans clustering) + `select_cross_samples` (randomly draw one factor per cluster, then down-sample to `css.n_select`). Hyperparameters `k` and `css.n_select` control the number of clusters and the count of chosen representatives. |
+| CoE | `fama/coe/manager.py` | `CoEManager` rebuilds γ-ranked experience chains from the latest clusters each run, then applies correlation-aware extensions/splits when higher-γ factors arrive. |
 | Prompting | `fama/mining/prompt_builder.py` | Reads `prompts/alpha_prompt_template.txt`, fills placeholders `{css_examples}`, `{coe_path}`, `{constraints}`, and parses LLM responses. |
 | Orchestrator | `fama/mining/orchestrator.py` | Loads configs, market data, FactorSet cache, runs CSS/CoE if enabled, builds prompts, calls the LLM client, validates responses, and extends the factor library. |
 | LLM Client | `fama/mining/llm_client.py` | Replace `_fallback_generation` with your provider call. Until you do, a deterministic pseudo-response keeps tests/CLI working. |
@@ -36,7 +36,7 @@ The CLI prints newly generated expressions. Pass `--output ./artifacts/run.yaml`
 - **Derived Series**：当 `close`/`volume` 存在时自动注入 `RET`、`VWAP`；字段可通过 `llm.deny_fields` 做黑名单控制。
 - **KunQuant Backend**：`fama/data/kun_backend.py` 将 `(T,N)` 布局输入喂给 KunQuant JIT，批量执行 Alpha；`compute.use_kunquant=false` 时自动回退到 Python 解释器。
 - **Expression DSL / Operators**：白名单覆盖 `RANK/DELTA/TS_MEAN/TS_STDDEV/CORREL/Z_SCORE/SIGN/ABS`，并由语义卡片 + 解析层双重限制，确保 LLM 不会输出未知算子或字段。
-- **Seed Library**：项目随发行同步解析 KunQuant `predefined.Alpha101` 中可用的符号（当前 82 条，`alpha001`~`alpha101` 之间的子集），并写入 FactorCache；这些表达式运行时直接走 KunQuant 预置实现。
+- **Seed Library**：项目启动时自动解析 KunQuant `predefined.Alpha101` 中可用的符号（当前 82 条，`alpha001`~`alpha101` 之间的子集），并将其符号化表达写入 FactorCache；随后的因子计算完全依赖 KunQuant 的算子体系。
 
 ## Prompt & LLM Integration
 1. Populate `.env` from `.env.example`（或设置 `llm.api_key_env` 对应的变量）。

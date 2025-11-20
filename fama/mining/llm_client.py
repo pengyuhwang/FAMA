@@ -52,14 +52,19 @@ def request_new_factors(
 
     client = OpenAI(api_key=effective_key)
     # ✅ 使用 Chat Completions；不要传 reasoning 参数
-    resp = client.chat.completions.create(
-        model=model,  # 例如 "gpt-4o-mini"
-        temperature=float(temperature or 0.2),
-        messages=[
-            {"role": "system", "content": "You are a quant researcher. Return one alpha per line."},
-            {"role": "user", "content": prompt},
-        ],
-    )
+    try:
+        resp = client.chat.completions.create(
+            model=model,  # 例如 "gpt-4o-mini"
+            temperature=float(temperature or 0.2),
+            messages=[
+                {"role": "system", "content": "You are a quant researcher. Return one alpha per line."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+    except Exception as exc:  # pragma: no cover - 网络/SDK 异常
+        if logger is not None:
+            logger.warning("LLM call failed (%s); falling back to deterministic output.", exc)
+        return _fallback_generation(prompt, allowed_fields, logger)
     content = (resp.choices[0].message.content or "").strip()
     if logger is not None:
         logger.info("LLM raw output: %s", content)

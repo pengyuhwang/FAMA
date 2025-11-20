@@ -4,6 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fama"
+version = "0.1.0"
 description = "Skeleton FAMA factor-mining framework"
 readme = "README.md"
 license = { text = "MIT" }
