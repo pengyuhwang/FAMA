@@ -24,7 +24,7 @@ The CLI prints newly generated expressions. Pass `--output ./artifacts/run.yaml`
 | ----- | -------- | ----------- |
 | Data / Compute | `fama/data/dataloader.py`, `fama/data/kun_backend.py` | `load_market_data` 规整 `(date, symbol)` MultiIndex；`available_factor_inputs` 抽取可用字段；`compute_factor_values` 优先走 KunQuant（TS 布局、多线程执行），KunQuant 失败或关闭时回退到 Python 解释器。 |
 | CSS | `fama/css/cluster.py` | `cluster_factors_kmeans` (KMeans clustering) + `select_cross_samples` (randomly draw one factor per cluster, then down-sample to `css.n_select`). Hyperparameters `k` and `css.n_select` control the number of clusters and the count of chosen representatives. |
-| CoE | `fama/coe/manager.py` | `CoEManager` rebuilds γ-ranked experience chains from the latest clusters each run, then applies correlation-aware extensions/splits when higher-γ factors arrive. |
+| CoE | `fama/coe/manager.py` | `CoEManager` rebuilds γ-ranked experience chains from the latest clusters each run，优先读取 `factor_value_prepared/factor_ric.csv` 中的 RankIC（缺失时实时计算），按 RIC 绝对值从低到高构造经验链并遵守 `prompt_chains` / `max_depth`。 |
 | Prompting | `fama/mining/prompt_builder.py` | Reads `prompts/alpha_prompt_template.txt`, fills placeholders `{css_examples}`, `{coe_path}`, `{constraints}`, and parses LLM responses. |
 | Orchestrator | `fama/mining/orchestrator.py` | Loads configs, market data, FactorSet cache, runs CSS/CoE if enabled, builds prompts, calls the LLM client, validates responses, and extends the factor library. |
 | LLM Client | `fama/mining/llm_client.py` | Replace `_fallback_generation` with your provider call. Until you do, a deterministic pseudo-response keeps tests/CLI working. |
@@ -37,6 +37,24 @@ The CLI prints newly generated expressions. Pass `--output ./artifacts/run.yaml`
 - **KunQuant Backend**：`fama/data/kun_backend.py` 将 `(T,N)` 布局输入喂给 KunQuant JIT，批量执行 Alpha；`compute.use_kunquant=false` 时自动回退到 Python 解释器。
 - **Expression DSL / Operators**：白名单覆盖 `RANK/DELTA/TS_MEAN/TS_STDDEV/CORREL/Z_SCORE/SIGN/ABS`，并由语义卡片 + 解析层双重限制，确保 LLM 不会输出未知算子或字段。
 - **Seed Library**：项目启动时自动解析 KunQuant `predefined.Alpha101` 中可用的符号（当前 82 条，`alpha001`~`alpha101` 之间的子集），并将其符号化表达写入 FactorCache；随后的因子计算完全依赖 KunQuant 的算子体系。
+
+## Factor Value / RankIC Utilities
+`factor_value_prepared/` 目录提供了两份离线脚本：
+
+| Script | Description |
+| --- | --- |
+| `python -m factor_value_prepared.compute_factor_values --config fama/config/defaults.yaml --output factor_value_prepared/factor_values.csv` | 读取 factor cache 中的所有表达式，通过与主流程相同的 `compute_factor_values(...)`（KunQuant 优先，失败回退 Python）计算因子值，并将结果堆叠为 `time / unique_id / factor_tag / value`（每次运行都会覆盖输出）。 |
+| `python -m factor_value_prepared.compute_ric --config fama/config/defaults.yaml --input factor_value_prepared/factor_values.csv --output factor_value_prepared/factor_ric.csv` | 复用 `RankIC/RankIC_Compute.ipynb` 的配置：行情 `close` 做 `ffill().bfill()`，收益率用 `pct_change().shift(-1)`，每个 `(因子, 资产)` 序列调用 `RankIC/efficientCalculation.EfficientCalculator.efficent_cal_ric` 得到 Spearman RIC。时间窗口可通过 `--start/--end` 或 YAML 中的 `coe.ric_start_date` / `coe.ric_end_date` 控制。输出 CSV 默认 `factor_value_prepared/factor_ric.csv`，CoE 会优先读取该文件；缺失时才回退到实时计算。 |
+
+此外，`alphatest/compute_alpha101_extfunction.py` 使用 `alphatest/ExtFunction.py` 的 JIT 接口重跑 KunQuant 内置 Alpha101，可用于对比 DSL 解析与官方实现的数值一致性。
+
+## Factor Correlation Heatmaps
+`factor_correlation/compute_correlation.py` 会从 factor cache 计算所有因子值，生成：
+
+- `python -m factor_correlation.compute_correlation --subset all`：输出 `all_factors_corr.png` / `all_factors_corr.csv`；
+- `python -m factor_correlation.compute_correlation --subset llm`：输出 `llm_factors_corr.*`、`llm_vs_all_corr.*`，并写入 `llm_vs_alpha_top10.csv`（每个 LLM 因子与 Alpha 因子绝对相关性最高的 10 项）。
+
+所有图表默认输出至 `factor_correlation/output/`。
 
 ## Prompt & LLM Integration
 1. Populate `.env` from `.env.example`（或设置 `llm.api_key_env` 对应的变量）。
@@ -56,6 +74,7 @@ The CLI prints newly generated expressions. Pass `--output ./artifacts/run.yaml`
 | `paths.market_data` | CSV/Parquet 路径；缺失时回退到模拟数据。 |
 | `paths.factor_cache` | 初始 FactorSet YAML（启动时解析 KunQuant Alpha101 预置表达式并写入）。 |
 | `paths.factor_outputs` | 计算后的因子值保存目录（每个表达式单独一个文件）。 |
+| `paths.factor_ric` | 预计算 RankIC 的 CSV（例如 `factor_value_prepared/factor_ric.csv`，CoE 将优先读取）。 |
 | `paths.prompts_dir` / `paths.output_dir` | 模板/产物路径。 |
 | `llm.*` | Provider、模型、温度、reasoning、算子白名单、字段黑名单、API key 等。 |
 | `compute.use_kunquant` | 是否启用 KunQuant 后端；关闭则强制使用 Python 解释器。 |
