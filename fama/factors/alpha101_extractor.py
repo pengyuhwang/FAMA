@@ -21,6 +21,7 @@ except Exception:  # pragma: no cover
 class AlphaExpression:
     name: str
     expression: str
+    explanation: str | None = None
 
 
 def _require_kunquant() -> None:

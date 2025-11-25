@@ -1,0 +1,394 @@
+- name: alpha001
+  expression: RANK(TS_ARGMAX((IF(LT(((CLOSE / DELAY(CLOSE, 1)) - 1), 0), TS_STDDEV(((CLOSE
+    / DELAY(CLOSE, 1)) - 1), 20), CLOSE) * IF(LT(((CLOSE / DELAY(CLOSE, 1)) - 1),
+    0), TS_STDDEV(((CLOSE / DELAY(CLOSE, 1)) - 1), 20), CLOSE)), 5))
+  explanation: null
+- name: alpha002
+  expression: REPLACE_NAN_INF((CORREL(RANK((LOG(VOLUME) - DELAY(LOG(VOLUME), 2))),
+    RANK(((CLOSE - OPEN) / OPEN)), 6) * -1), 0)
+  explanation: null
+- name: alpha003
+  expression: REPLACE_NAN_INF((CORREL(RANK(OPEN), RANK(VOLUME), 10) * -1), 0)
+  explanation: null
+- name: alpha004
+  expression: (TS_RANK(RANK(LOW), 9) * -1)
+  explanation: null
+- name: alpha005
+  expression: (RANK((OPEN - (TS_SUM((AMOUNT / (VOLUME + 1e-07)), 10) / 10))) * (ABS(RANK((CLOSE
+    - (AMOUNT / (VOLUME + 1e-07))))) * -1))
+  explanation: null
+- name: alpha006
+  expression: REPLACE_NAN_INF((CORREL(OPEN, VOLUME, 10) * -1), 0)
+  explanation: null
+- name: alpha007
+  expression: IF(GE(TS_MEAN(VOLUME, 20), VOLUME), -1, ((TS_RANK(ABS((CLOSE - DELAY(CLOSE,
+    7))), 60) * SIGN((CLOSE - DELAY(CLOSE, 7)))) * -1))
+  explanation: null
+- name: alpha008
+  expression: (RANK(((TS_SUM(OPEN, 5) * TS_SUM(((CLOSE / DELAY(CLOSE, 1)) - 1), 5))
+    - DELAY((TS_SUM(OPEN, 5) * TS_SUM(((CLOSE / DELAY(CLOSE, 1)) - 1), 5)), 10)))
+    * -1)
+  explanation: null
+- name: alpha009
+  expression: IF(OR(GT(TS_MIN((CLOSE - DELAY(CLOSE, 1)), 5), 0), LT(TS_MAX((CLOSE
+    - DELAY(CLOSE, 1)), 5), 0)), (CLOSE - DELAY(CLOSE, 1)), ((CLOSE - DELAY(CLOSE,
+    1)) * -1))
+  explanation: null
+- name: alpha010
+  expression: IF(OR(GT(TS_MIN((CLOSE - DELAY(CLOSE, 1)), 4), 0), LT(TS_MAX((CLOSE
+    - DELAY(CLOSE, 1)), 4), 0)), (CLOSE - DELAY(CLOSE, 1)), ((CLOSE - DELAY(CLOSE,
+    1)) * -1))
+  explanation: null
+- name: alpha011
+  expression: ((RANK(TS_MAX(((AMOUNT / (VOLUME + 1e-07)) - CLOSE), 3)) + RANK(TS_MIN(((AMOUNT
+    / (VOLUME + 1e-07)) - CLOSE), 3))) * RANK((VOLUME - DELAY(VOLUME, 3))))
+  explanation: null
+- name: alpha012
+  expression: (SIGN((VOLUME - DELAY(VOLUME, 1))) * ((CLOSE - DELAY(CLOSE, 1)) * -1))
+  explanation: null
+- name: alpha013
+  expression: (RANK(COVAR(RANK(CLOSE), RANK(VOLUME), 5)) * -1)
+  explanation: null
+- name: alpha014
+  expression: ((RANK((((CLOSE / DELAY(CLOSE, 1)) - 1) - DELAY(((CLOSE / DELAY(CLOSE,
+    1)) - 1), 3))) * REPLACE_NAN_INF(CORREL(OPEN, VOLUME, 10), 0)) * -1)
+  explanation: null
+- name: alpha015
+  expression: (TS_SUM(RANK(REPLACE_NAN_INF(CORREL(RANK(HIGH), RANK(VOLUME), 3), 0)),
+    3) * -1)
+  explanation: null
+- name: alpha016
+  expression: (RANK(COVAR(RANK(HIGH), RANK(VOLUME), 5)) * -1)
+  explanation: null
+- name: alpha017
+  expression: (((RANK(TS_RANK(CLOSE, 10)) * RANK(((CLOSE - DELAY(CLOSE, 1)) - DELAY((CLOSE
+    - DELAY(CLOSE, 1)), 1)))) * RANK(TS_RANK(REPLACE_NAN_INF((VOLUME / TS_MEAN(VOLUME,
+    20)), 0), 5))) * -1)
+  explanation: null
+- name: alpha018
+  expression: (RANK(((TS_STDDEV(ABS((CLOSE - OPEN)), 5) + (CLOSE - OPEN)) + REPLACE_NAN_INF(CORREL(CLOSE,
+    OPEN, 10), 0))) * -1)
+  explanation: null
+- name: alpha019
+  expression: ((SIGN(((CLOSE - DELAY(CLOSE, 7)) + (CLOSE - DELAY(CLOSE, 7)))) * -1)
+    * (RANK((TS_SUM(((CLOSE / DELAY(CLOSE, 1)) - 1), 250) + 1)) + 1))
+  explanation: null
+- name: alpha020
+  expression: (((RANK((OPEN - DELAY(HIGH, 1))) * RANK((OPEN - DELAY(CLOSE, 1)))) *
+    RANK((OPEN - DELAY(LOW, 1)))) * -1)
+  explanation: null
+- name: alpha021
+  expression: IF(AND(NOT(LT((TS_MEAN(CLOSE, 8) + TS_STDDEV(CLOSE, 8)), TS_MEAN(CLOSE,
+    2))), OR(LT(TS_MEAN(CLOSE, 2), (TS_MEAN(CLOSE, 8) - TS_STDDEV(CLOSE, 8))), GE((VOLUME
+    / TS_MEAN(VOLUME, 20)), 1))), 1, -1)
+  explanation: null
+- name: alpha022
+  expression: (((REPLACE_NAN_INF(CORREL(HIGH, VOLUME, 5), 0) - DELAY(REPLACE_NAN_INF(CORREL(HIGH,
+    VOLUME, 5), 0), 5)) * -1) * RANK(TS_STDDEV(CLOSE, 20)))
+  explanation: null
+- name: alpha023
+  expression: IF(LT(TS_MEAN(HIGH, 20), HIGH), (REPLACE_NAN_INF((HIGH - DELAY(HIGH,
+    2)), 0) * -1), 0)
+  explanation: null
+- name: alpha024
+  expression: IF(LE(((TS_MEAN(CLOSE, 100) - DELAY(TS_MEAN(CLOSE, 100), 100)) / DELAY(CLOSE,
+    100)), 0.05), ((CLOSE - TS_MIN(CLOSE, 100)) * -1), ((CLOSE - DELAY(CLOSE, 3))
+    * -1))
+  explanation: null
+- name: alpha025
+  expression: RANK(((((((CLOSE / DELAY(CLOSE, 1)) - 1) * -1) * TS_MEAN(VOLUME, 20))
+    * (AMOUNT / (VOLUME + 1e-07))) * (HIGH - CLOSE)))
+  explanation: null
+- name: alpha026
+  expression: (TS_MAX(REPLACE_NAN_INF(CORREL(TS_RANK(VOLUME, 5), TS_RANK(HIGH, 5),
+    5), 0), 3) * -1)
+  explanation: null
+- name: alpha027
+  expression: IF(GT(RANK((TS_MEAN(CORREL(RANK(VOLUME), RANK((AMOUNT / (VOLUME + 1e-07))),
+    6), 2) / 2)), 0.5), -1, 1)
+  explanation: null
+- name: alpha028
+  expression: SCALE(((REPLACE_NAN_INF(CORREL(TS_MEAN(VOLUME, 20), LOW, 5), 0) + ((HIGH
+    + LOW) / 2)) - CLOSE))
+  explanation: null
+- name: alpha029
+  expression: (TS_MIN(RANK(RANK(SCALE(LOG(TS_SUM(RANK(RANK((RANK(((CLOSE - 1) - DELAY((CLOSE
+    - 1), 5))) * -1))), 2))))), 5) + TS_RANK(DELAY((((CLOSE / DELAY(CLOSE, 1)) - 1)
+    * -1), 6), 5))
+  explanation: null
+- name: alpha030
+  expression: ((RANK(((SIGN((CLOSE - DELAY(CLOSE, 1))) + SIGN(DELAY((CLOSE - DELAY(CLOSE,
+    1)), 1))) + SIGN(DELAY((CLOSE - DELAY(CLOSE, 1)), 2)))) - 1) * REPLACE_NAN_INF((TS_SUM(VOLUME,
+    5) / TS_SUM(VOLUME, 20)), 1))
+  explanation: null
+- name: alpha031
+  expression: ((RANK(RANK(RANK(DECAY_LINEAR((RANK(RANK((CLOSE - DELAY(CLOSE, 10))))
+    * -1), 10)))) + RANK(((CLOSE - DELAY(CLOSE, 3)) * -1))) + SIGN(SCALE(REPLACE_NAN_INF(CORREL(TS_MEAN(VOLUME,
+    20), LOW, 12), 0))))
+  explanation: null
+- name: alpha032
+  expression: (SCALE(((TS_MEAN(CLOSE, 7) / 7) - CLOSE)) + (SCALE(CORREL((AMOUNT /
+    (VOLUME + 1e-07)), DELAY(CLOSE, 5), 230)) * 20))
+  explanation: null
+- name: alpha033
+  expression: RANK(((OPEN / CLOSE) - 1))
+  explanation: null
+- name: alpha034
+  expression: RANK(((RANK(REPLACE_NAN_INF((TS_STDDEV(((CLOSE / DELAY(CLOSE, 1)) -
+    1), 2) / TS_STDDEV(((CLOSE / DELAY(CLOSE, 1)) - 1), 5)), 1)) - 2) - RANK((CLOSE
+    - DELAY(CLOSE, 1)))))
+  explanation: null
+- name: alpha035
+  expression: ((TS_RANK(VOLUME, 32) * (TS_RANK(((CLOSE + HIGH) - LOW), 16) - 1)) *
+    (TS_RANK(((CLOSE / DELAY(CLOSE, 1)) - 1), 32) - 1))
+  explanation: null
+- name: alpha036
+  expression: (((((RANK(CORREL((CLOSE - OPEN), DELAY(VOLUME, 1), 15)) * 2.21) + (RANK((OPEN
+    - CLOSE)) * 0.7)) + (RANK(TS_RANK(DELAY((((CLOSE / DELAY(CLOSE, 1)) - 1) * -1),
+    6), 5)) * 0.73)) + RANK(ABS(CORREL((AMOUNT / (VOLUME + 1e-07)), TS_MEAN(VOLUME,
+    20), 6)))) + (RANK((((TS_MEAN(CLOSE, 200) / 200) - OPEN) * (CLOSE - OPEN))) *
+    0.6))
+  explanation: null
+- name: alpha037
+  expression: (RANK(CORREL(DELAY((OPEN - CLOSE), 1), CLOSE, 200)) + RANK((OPEN - CLOSE)))
+  explanation: null
+- name: alpha038
+  expression: ((RANK(TS_RANK(OPEN, 10)) * -1) * RANK(REPLACE_NAN_INF((CLOSE / OPEN),
+    1)))
+  explanation: null
+- name: alpha039
+  expression: ((RANK(((CLOSE - DELAY(CLOSE, 7)) * (RANK(DECAY_LINEAR((VOLUME / TS_MEAN(VOLUME,
+    20)), 9)) - 1))) * -1) * (RANK(TS_MEAN(((CLOSE / DELAY(CLOSE, 1)) - 1), 250))
+    + 1))
+  explanation: null
+- name: alpha040
+  expression: ((RANK(TS_STDDEV(HIGH, 10)) * -1) * REPLACE_NAN_INF(CORREL(HIGH, VOLUME,
+    10), 1))
+  explanation: null
+- name: alpha041
+  expression: (((HIGH * LOW) ** 0.5) - (AMOUNT / (VOLUME + 1e-07)))
+  explanation: null
+- name: alpha042
+  expression: (RANK(((AMOUNT / (VOLUME + 1e-07)) - CLOSE)) / RANK(((AMOUNT / (VOLUME
+    + 1e-07)) + CLOSE)))
+  explanation: null
+- name: alpha043
+  expression: (TS_RANK(REPLACE_NAN_INF((VOLUME / TS_MEAN(VOLUME, 20)), 0), 20) * TS_RANK(((CLOSE
+    - DELAY(CLOSE, 7)) * -1), 8))
+  explanation: null
+- name: alpha044
+  expression: (REPLACE_NAN_INF(CORREL(HIGH, RANK(VOLUME), 5), 0) * -1)
+  explanation: null
+- name: alpha045
+  expression: (((RANK(TS_MEAN(DELAY(CLOSE, 5), 20)) * REPLACE_NAN_INF(CORREL(CLOSE,
+    VOLUME, 2), 0)) * RANK(REPLACE_NAN_INF(CORREL(TS_SUM(CLOSE, 5), TS_SUM(CLOSE,
+    20), 2), 1))) * -1)
+  explanation: null
+- name: alpha046
+  expression: IF(GT((((DELAY(CLOSE, 20) - DELAY(CLOSE, 10)) / 10) - ((DELAY(CLOSE,
+    10) - CLOSE) / 10)), 0.25), -1, IF(LT((((DELAY(CLOSE, 20) - DELAY(CLOSE, 10))
+    / 10) - ((DELAY(CLOSE, 10) - CLOSE) / 10)), 0), 1, ((CLOSE - DELAY(CLOSE, 1))
+    * -1)))
+  explanation: null
+- name: alpha047
+  expression: REPLACE_NAN_INF(((((RANK((CLOSE / 1)) * VOLUME) / TS_MEAN(VOLUME, 20))
+    * ((HIGH * RANK((HIGH - CLOSE))) / (TS_MEAN(HIGH, 5) / 5))) - RANK(((AMOUNT /
+    (VOLUME + 1e-07)) - DELAY((AMOUNT / (VOLUME + 1e-07)), 5)))), 0)
+  explanation: null
+- name: alpha049
+  expression: IF(LT((((DELAY(CLOSE, 20) - DELAY(CLOSE, 10)) / 10) - ((DELAY(CLOSE,
+    10) - CLOSE) / 10)), -0.1), 1, ((CLOSE - DELAY(CLOSE, 1)) * -1))
+  explanation: null
+- name: alpha050
+  expression: (TS_MAX(RANK(REPLACE_NAN_INF(CORREL(RANK(VOLUME), RANK((AMOUNT / (VOLUME
+    + 1e-07))), 5), 0)), 5) * -1)
+  explanation: null
+- name: alpha051
+  expression: IF(LT((((DELAY(CLOSE, 20) - DELAY(CLOSE, 10)) / 10) - ((DELAY(CLOSE,
+    10) - CLOSE) / 10)), -0.05), 1, ((CLOSE - DELAY(CLOSE, 1)) * -1))
+  explanation: null
+- name: alpha052
+  expression: ((((TS_MIN(LOW, 5) - DELAY(TS_MIN(LOW, 5), 5)) * -1) * RANK(((TS_SUM(((CLOSE
+    / DELAY(CLOSE, 1)) - 1), 240) - TS_SUM(((CLOSE / DELAY(CLOSE, 1)) - 1), 20)) /
+    220))) * TS_RANK(VOLUME, 5))
+  explanation: null
+- name: alpha053
+  expression: (((((CLOSE - LOW) - (HIGH - CLOSE)) / IF(EQ((CLOSE - LOW), 0), 0.0001,
+    (CLOSE - LOW))) - DELAY((((CLOSE - LOW) - (HIGH - CLOSE)) / IF(EQ((CLOSE - LOW),
+    0), 0.0001, (CLOSE - LOW))), 9)) * -1)
+  explanation: null
+- name: alpha054
+  expression: ((((LOW - CLOSE) * -1) * (OPEN ** 5)) / (IF(EQ((LOW - HIGH), 0), 0.0001,
+    (LOW - HIGH)) * (CLOSE ** 5)))
+  explanation: null
+- name: alpha055
+  expression: (REPLACE_NAN_INF(CORREL(RANK(((CLOSE - TS_MIN(LOW, 12)) / IF(EQ((TS_MAX(HIGH,
+    12) - TS_MIN(LOW, 12)), 0), 0.0001, (TS_MAX(HIGH, 12) - TS_MIN(LOW, 12))))), RANK(VOLUME),
+    6), 0) * -1)
+  explanation: null
+- name: alpha057
+  expression: ((((CLOSE - (AMOUNT / (VOLUME + 1e-07))) / DECAY_LINEAR(RANK(TS_ARGMAX(CLOSE,
+    30)), 2)) * 1) - 0)
+  explanation: null
+- name: alpha060
+  expression: (((SCALE(RANK(((((CLOSE - LOW) - (HIGH - CLOSE)) * VOLUME) / IF(EQ((HIGH
+    - LOW), 0), 0.0001, (HIGH - LOW))))) * 2) - SCALE(RANK(TS_ARGMAX(CLOSE, 10))))
+    - 0)
+  explanation: null
+- name: alpha061
+  expression: IF(LT(RANK(((AMOUNT / (VOLUME + 1e-07)) - TS_MIN((AMOUNT / (VOLUME +
+    1e-07)), 16))), RANK(CORREL((AMOUNT / (VOLUME + 1e-07)), TS_MEAN(VOLUME, 180),
+    18))), 1, 0)
+  explanation: null
+- name: alpha062
+  expression: (IF(LT(RANK(CORREL((AMOUNT / (VOLUME + 1e-07)), TS_MEAN(TS_MEAN(VOLUME,
+    20), 22), 10)), RANK(IF(LT((RANK(OPEN) + RANK(OPEN)), (RANK(((HIGH + LOW) / 2))
+    + RANK(HIGH))), 1, 0))), 1, 0) * -1)
+  explanation: null
+- name: alpha064
+  expression: (IF(LT(RANK(CORREL(TS_MEAN(((OPEN * 0.178404) + (LOW * 0.821596)), 13),
+    TS_MEAN(TS_MEAN(VOLUME, 120), 13), 17)), RANK((((((HIGH + LOW) / 2) * 0.178404)
+    + ((AMOUNT / (VOLUME + 1e-07)) * 0.821596)) - DELAY(((((HIGH + LOW) / 2) * 0.178404)
+    + ((AMOUNT / (VOLUME + 1e-07)) * 0.821596)), 4)))), 1, 0) * -1)
+  explanation: null
+- name: alpha065
+  expression: (IF(LT(RANK(CORREL(((OPEN * 0.00817205) + ((AMOUNT / (VOLUME + 1e-07))
+    * 0.99182795)), TS_MEAN(TS_MEAN(VOLUME, 60), 9), 6)), RANK((OPEN - TS_MIN(OPEN,
+    14)))), 1, 0) * -1)
+  explanation: null
+- name: alpha066
+  expression: ((RANK(DECAY_LINEAR(((AMOUNT / (VOLUME + 1e-07)) - DELAY((AMOUNT / (VOLUME
+    + 1e-07)), 4)), 7)) + TS_RANK(DECAY_LINEAR(REPLACE_NAN_INF(((((LOW * 0.96633)
+    + (LOW * 0.03367)) - (AMOUNT / (VOLUME + 1e-07))) / (OPEN - ((HIGH + LOW) / 2))),
+    0), 11), 7)) * -1)
+  explanation: null
+- name: alpha068
+  expression: (IF(LT(TS_RANK(CORREL(RANK(HIGH), RANK(TS_MEAN(VOLUME, 15)), 9), 14),
+    RANK((((CLOSE * 0.518371) + (LOW * 0.481629)) - DELAY(((CLOSE * 0.518371) + (LOW
+    * 0.481629)), 1)))), 1, 0) * -1)
+  explanation: null
+- name: alpha071
+  expression: MAX(TS_RANK(DECAY_LINEAR(CORREL(TS_RANK(CLOSE, 3), TS_RANK(TS_MEAN(VOLUME,
+    180), 12), 18), 4), 16), TS_RANK(DECAY_LINEAR((RANK(((LOW + OPEN) - ((AMOUNT /
+    (VOLUME + 1e-07)) + (AMOUNT / (VOLUME + 1e-07))))) ** 2), 16), 4))
+  explanation: null
+- name: alpha072
+  expression: ((RANK(DECAY_LINEAR(CORREL(((HIGH + LOW) / 2), TS_MEAN(VOLUME, 40),
+    9), 10)) + 0.0001) / (RANK(DECAY_LINEAR(CORREL(TS_RANK((AMOUNT / (VOLUME + 1e-07)),
+    4), TS_RANK(VOLUME, 19), 7), 3)) + 0.0001))
+  explanation: null
+- name: alpha073
+  expression: (MAX(RANK(DECAY_LINEAR(((AMOUNT / (VOLUME + 1e-07)) - DELAY((AMOUNT
+    / (VOLUME + 1e-07)), 5)), 3)), TS_RANK(DECAY_LINEAR((((((OPEN * 0.147155) + (LOW
+    * 0.852845)) - DELAY(((OPEN * 0.147155) + (LOW * 0.852845)), 2)) / ((OPEN * 0.147155)
+    + (LOW * 0.852845))) * -1), 3), 17)) * -1)
+  explanation: null
+- name: alpha074
+  expression: (IF(LT(RANK(CORREL(CLOSE, TS_MEAN(TS_MEAN(VOLUME, 30), 37), 15)), RANK(CORREL(RANK(((HIGH
+    * 0.0261661) + ((AMOUNT / (VOLUME + 1e-07)) * 0.9738339))), RANK(VOLUME), 11))),
+    1, 0) * -1)
+  explanation: null
+- name: alpha075
+  expression: IF(LT(RANK(CORREL((AMOUNT / (VOLUME + 1e-07)), VOLUME, 4)), RANK(CORREL(RANK(LOW),
+    RANK(TS_MEAN(VOLUME, 50)), 12))), 1, 0)
+  explanation: null
+- name: alpha077
+  expression: MIN(RANK(DECAY_LINEAR(((((HIGH + LOW) / 2) + HIGH) - ((AMOUNT / (VOLUME
+    + 1e-07)) + HIGH)), 20)), RANK(DECAY_LINEAR(REPLACE_NAN_INF(CORREL(((HIGH + LOW)
+    / 2), TS_MEAN(VOLUME, 40), 3), 1), 6)))
+  explanation: null
+- name: alpha078
+  expression: (RANK(CORREL(TS_SUM(((LOW * 0.352233) + ((AMOUNT / (VOLUME + 1e-07))
+    * 0.647767)), 20), TS_SUM(TS_MEAN(VOLUME, 40), 20), 7)) ** RANK(REPLACE_NAN_INF(CORREL(RANK((AMOUNT
+    / (VOLUME + 1e-07))), RANK(VOLUME), 6), 0)))
+  explanation: null
+- name: alpha081
+  expression: (IF(LT(RANK(LOG(TS_PRODUCT(RANK((RANK(CORREL((AMOUNT / (VOLUME + 1e-07)),
+    TS_SUM(TS_MEAN(VOLUME, 10), 50), 8)) ** 4)), 15))), RANK(CORREL(RANK((AMOUNT /
+    (VOLUME + 1e-07))), RANK(VOLUME), 5))), 1, 0) * -1)
+  explanation: null
+- name: alpha083
+  expression: ((RANK(DELAY(((HIGH - LOW) / (TS_SUM(CLOSE, 5) / 5)), 2)) * RANK(RANK(VOLUME)))
+    / (((HIGH - LOW) / (TS_SUM(CLOSE, 5) / 5)) / ((AMOUNT / (VOLUME + 1e-07)) - CLOSE)))
+  explanation: null
+- name: alpha084
+  expression: (TS_RANK(((AMOUNT / (VOLUME + 1e-07)) - TS_MAX((AMOUNT / (VOLUME + 1e-07)),
+    15)), 21) ** (CLOSE - DELAY(CLOSE, 5)))
+  explanation: null
+- name: alpha085
+  expression: (RANK(REPLACE_NAN_INF(CORREL(((HIGH * 0.876703) + (CLOSE * 0.123297)),
+    TS_MEAN(VOLUME, 30), 10), 1)) ** RANK(REPLACE_NAN_INF(CORREL(TS_RANK(((HIGH +
+    LOW) / 2), 4), TS_RANK(VOLUME, 10), 7), 1)))
+  explanation: null
+- name: alpha086
+  expression: (IF(LT(TS_RANK(CORREL(CLOSE, TS_MEAN(TS_MEAN(VOLUME, 20), 15), 6), 20),
+    RANK(((OPEN + CLOSE) - ((AMOUNT / (VOLUME + 1e-07)) + OPEN)))), 1, 0) * -1)
+  explanation: null
+- name: alpha088
+  expression: MIN(TS_RANK(DECAY_LINEAR(REPLACE_NAN_INF(CORREL(TS_RANK(CLOSE, 8), TS_RANK(TS_MEAN(VOLUME,
+    60), 21), 8), 0), 7), 3), RANK(DECAY_LINEAR(((RANK(OPEN) + RANK(LOW)) - (RANK(HIGH)
+    + RANK(CLOSE))), 8)))
+  explanation: null
+- name: alpha092
+  expression: MIN(TS_RANK(DECAY_LINEAR(REPLACE_NAN_INF(CORREL(RANK(LOW), RANK(TS_MEAN(VOLUME,
+    30)), 8), 0), 7), 7), TS_RANK(DECAY_LINEAR(IF(LT((((HIGH + LOW) / 2) + CLOSE),
+    (LOW + OPEN)), 1, 0), 15), 19))
+  explanation: null
+- name: alpha094
+  expression: ((RANK(((AMOUNT / (VOLUME + 1e-07)) - TS_MIN((AMOUNT / (VOLUME + 1e-07)),
+    12))) ** TS_RANK(REPLACE_NAN_INF(CORREL(TS_RANK((AMOUNT / (VOLUME + 1e-07)), 20),
+    TS_RANK(TS_MEAN(VOLUME, 60), 4), 18), 0), 3)) * -1)
+  explanation: null
+- name: alpha095
+  expression: IF(LT(RANK((OPEN - TS_MIN(OPEN, 12))), TS_RANK((RANK(CORREL(TS_MEAN(((HIGH
+    + LOW) / 2), 19), TS_MEAN(TS_MEAN(VOLUME, 40), 19), 13)) ** 5), 12)), 1, 0)
+  explanation: null
+- name: alpha096
+  expression: (MAX(TS_RANK(DECAY_LINEAR(REPLACE_NAN_INF(CORREL(RANK((AMOUNT / (VOLUME
+    + 1e-07))), RANK(VOLUME), 4), 0), 4), 8), TS_RANK(DECAY_LINEAR(TS_ARGMAX(REPLACE_NAN_INF(CORREL(TS_RANK(CLOSE,
+    7), TS_RANK(TS_MEAN(VOLUME, 60), 4), 4), 0), 13), 14), 13)) * -1)
+  explanation: null
+- name: alpha098
+  expression: (RANK(DECAY_LINEAR(CORREL((AMOUNT / (VOLUME + 1e-07)), TS_MEAN(TS_MEAN(VOLUME,
+    5), 26), 5), 7)) - RANK(DECAY_LINEAR(TS_RANK(TS_ARGMIN(REPLACE_NAN_INF(CORREL(RANK(OPEN),
+    RANK(TS_MEAN(VOLUME, 15)), 21), 0), 9), 7), 8)))
+  explanation: null
+- name: alpha099
+  expression: (IF(LT(RANK(CORREL(TS_SUM(((HIGH + LOW) / 2), 20), TS_SUM(TS_MEAN(VOLUME,
+    60), 20), 9)), RANK(CORREL(LOW, VOLUME, 6))), 1, 0) * -1)
+  explanation: null
+- name: alpha101
+  expression: ((CLOSE - OPEN) / ((HIGH - LOW) + 0.001))
+  explanation: null
+- name: alpha101
+  expression: ((CLOSE - OPEN) / ((HIGH - LOW) + 0.001))
+  explanation: 该因子衡量的是股票在一个交易日内价格波动的方向和幅度相对于其总波动范围的比例，反映了市场情绪和价格动量。
+- name: LLM_Factor1111111
+  expression: DECAY_LINEAR(TS_SUM((HIGH - LOW) / CLOSE, 10), 5)
+  explanation: 该因子衡量价格波动幅度相对于收盘价的变化，反映市场波动性。
+- name: LLM_Factor2222222
+  expression: DECAY_LINEAR(CORREL(OPEN, CLOSE, 10), 5)
+  explanation: 该因子捕捉的是开盘价与收盘价之间的短期相关性变化。
+- name: LLM_Factor3333333
+  expression: SCALE((REPLACE_NAN_INF(CORREL((VWAP - OPEN), RET, 12), 0) * -1))
+  explanation: 该因子度量开盘至VWAP的日内溢价与收益的相关性并取反以捕捉过度交易回落
+- name: LLM_Factor4444444
+  expression: (RANK(((AMOUNT / (VOLUME + 1e-07)) - OPEN)) * (TS_RANK((HIGH - LOW),
+    10) - 1))
+  explanation: 衡量开盘相对交易均价的偏离在窄幅行情中的修复动能。
+- name: LLM_Factor5555555
+  expression: IF(LT(TS_STDDEV(RET, 20), TS_STDDEV(RET, 60)), RANK((OPEN - TS_MEAN((AMOUNT
+    / (VOLUME + 1e-07)), 10))), RANK((TS_MEAN((AMOUNT / (VOLUME + 1e-07)), 10) - OPEN)))
+  explanation: 在低波动状态下利用开盘价相对换手价格均值的偏离捕捉回归，高波动时反向处理。
+- name: LLM_Factor6666666
+  expression: (RANK(CORREL(RET, (CLOSE - VWAP), 10)) * -1)
+  explanation: 衡量收益与盘中偏离VWAP的相关性强弱，捕捉因资金交易导致的均值回归压力。
+- name: LLM_Factor7777777
+  expression: RANK(CLOSE - DELAY(CLOSE, 5)) - RANK(CLOSE - DELAY(CLOSE, 20))
+  explanation: 利用短期动量减去长期动量，构建期限结构的差分因子，识别短期加速上涨或超卖信号。
+- name: LLM_Factor8888888
+  expression: (TS_MIN(LOW, 10) - TS_MIN(LOW, 30)) / (TS_MEAN(CLOSE, 30) + 1e-07)
+  explanation: 衡量短期支撑位相对于长期支撑位的抬升幅度，反映底部结构的稳固程度。
+- name: LLM_Factor9999999
+  expression: RANK(((CLOSE - TS_MEAN(VWAP, 10)) / (TS_STDDEV(CLOSE, 20) + 1e-07)))
+  explanation: 用相对波动标准化后的价格对VWAP偏离度评估超涨超跌。
