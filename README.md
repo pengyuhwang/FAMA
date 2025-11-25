@@ -39,14 +39,34 @@ The CLI prints newly generated expressions. Pass `--output ./artifacts/run.yaml`
 - **Seed Library**：项目启动时自动解析 KunQuant `predefined.Alpha101` 中可用的符号（当前 82 条，`alpha001`~`alpha101` 之间的子集），并将其符号化表达写入 FactorCache；随后的因子计算完全依赖 KunQuant 的算子体系。
 
 ## Factor Value / RankIC Utilities
-`factor_value_prepared/` 目录提供了两份离线脚本：
+`factor_value_prepared/` 目录提供了两份离线脚本（都会覆盖输出文件，确保始终是最新结果）：
 
 | Script | Description |
 | --- | --- |
-| `python -m factor_value_prepared.compute_factor_values --config fama/config/defaults.yaml --output factor_value_prepared/factor_values.csv` | 读取 factor cache 中的所有表达式，通过与主流程相同的 `compute_factor_values(...)`（KunQuant 优先，失败回退 Python）计算因子值，并将结果堆叠为 `time / unique_id / factor_tag / value`（每次运行都会覆盖输出）。 |
-| `python -m factor_value_prepared.compute_ric --config fama/config/defaults.yaml --input factor_value_prepared/factor_values.csv --output factor_value_prepared/factor_ric.csv` | 复用 `RankIC/RankIC_Compute.ipynb` 的配置：行情 `close` 做 `ffill().bfill()`，收益率用 `pct_change().shift(-1)`，每个 `(因子, 资产)` 序列调用 `RankIC/efficientCalculation.EfficientCalculator.efficent_cal_ric` 得到 Spearman RIC。时间窗口可通过 `--start/--end` 或 YAML 中的 `coe.ric_start_date` / `coe.ric_end_date` 控制。输出 CSV 默认 `factor_value_prepared/factor_ric.csv`，CoE 会优先读取该文件；缺失时才回退到实时计算。 |
+| ```bash
+python -m factor_value_prepared.compute_factor_values \
+    --config fama/config/defaults.yaml \
+    --output factor_value_prepared/factor_values.csv
+``` | 读取 factor cache 中的所有表达式，通过与主流程相同的 `compute_factor_values(...)`（KunQuant 优先，失败回退 Python）计算因子值，并将结果堆叠为 `time / unique_id / factor_tag / value`。 |
+| ```bash
+python -m factor_value_prepared.compute_ric \
+    --config fama/config/defaults.yaml \
+    --input factor_value_prepared/factor_values.csv \
+    --output factor_value_prepared/factor_ric.csv
+``` | 复用 `RankIC/RankIC_Compute.ipynb` 的配置：行情 `close` 做 `ffill().bfill()`，收益率用 `pct_change().shift(-1)`，每个 `(因子, 资产)` 序列调用 `RankIC/efficientCalculation.EfficientCalculator.efficent_cal_ric` 得到 Spearman RIC。时间窗口可通过 `--start/--end` 或 YAML 中的 `coe.ric_start_date` / `coe.ric_end_date` 控制。输出 CSV 默认 `factor_value_prepared/factor_ric.csv`，CoE 会优先读取该文件；缺失时才回退到实时计算。 |
 
-此外，`alphatest/compute_alpha101_extfunction.py` 使用 `alphatest/ExtFunction.py` 的 JIT 接口重跑 KunQuant 内置 Alpha101，可用于对比 DSL 解析与官方实现的数值一致性。
+### Standalone Alpha101 / DSL 基准
+
+| Script | Description |
+| --- | --- |
+| ```bash
+python -m alphatest.compute_alpha101_extfunction \
+    --config fama/config/defaults.yaml \
+    --output alphatest/factor_values_ext/alpha101_ext.csv
+``` | 调用 `alphatest/ExtFunction.py`（KunQuant 预编译 Alpha101）在真实数据上产出官方基准因子值。 |
+| `python alphatest/FactorCollection_dsl.py` | 通过 `FactorCollectionDSL.update_dsl_factors()` 读取 `factor_cache`，将 DSL 表达式经 `fama/data/kun_backend.py` 解析为 KunQuant Ops 并计算因子值，默认写入 `alphatest/data/factors/dsl_factors.parquet`（或通过 `output_path` 改写）。该函数沿用 `FactorCollection` 已构建好的行情框架（`self.native_price` / `self.working_days`）。 |
+
+这些脚本可与 `alphatest/data/factors/alpha101.parquet` 对比，帮助验证 DSL 解析与 KunQuant 官方实现的一致性。
 
 ## Factor Correlation Heatmaps
 `factor_correlation/compute_correlation.py` 会从 factor cache 计算所有因子值，生成：

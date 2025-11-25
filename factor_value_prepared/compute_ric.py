@@ -1,135 +1,132 @@
-#!/usr/bin/env python
-"""Compute per-asset RankIC metrics from precomputed factor values."""
-
-from __future__ import annotations
-
-import argparse
-from pathlib import Path
+from factor_value_prepared.backtest_utilts_new import *
 import pandas as pd
-import yaml
-
-from RankIC.efficientCalculation import EfficientCalculator
-from fama.data.dataloader import load_market_data
-
-
-def load_config(path: Path) -> dict:
-    with open(path, "r", encoding="utf-8") as fp:
-        return yaml.safe_load(fp)
+from factor_value_prepared.efficientCalculation import EfficientCalculator
+from tqdm import tqdm
+from pathlib import Path
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Compute per-asset RIC from factor CSV.")
-    parser.add_argument(
-        "--config",
-        default="fama/config/defaults.yaml",
-        type=Path,
-        help="Path to YAML configuration.",
-    )
-    parser.add_argument(
-        "--input",
-        default=Path("factor_value_prepared/factor_values.csv"),
-        type=Path,
-        help="Input CSV produced by compute_factor_values.py.",
-    )
-    parser.add_argument(
-        "--output",
-        default=Path("factor_value_prepared/factor_ric.csv"),
-        type=Path,
-        help="Destination CSV file (will be overwritten).",
-    )
-    parser.add_argument(
-        "--start",
-        type=str,
-        default=None,
-        help="Optional override for RIC start date (YYYY-MM-DD).",
-    )
-    parser.add_argument(
-        "--end",
-        type=str,
-        default=None,
-        help="Optional override for RIC end date (YYYY-MM-DD).",
-    )
-    args = parser.parse_args()
+def read_factor_file(file_path):
+    file_path = Path(file_path)
+    if not file_path.exists():
+        return None
+    # 读取存储的因子数据
+    if file_path.suffix == ".parquet":
+        factor_df = pd.read_parquet(file_path)
+    elif file_path.suffix == ".csv":
+        factor_df = pd.read_csv(file_path, parse_dates=["time"])
+    else:
+        raise ValueError(f"不支持的文件格式{file_path}")
+    return factor_df
 
-    cfg = load_config(args.config)
-    if not args.input.exists():
-        raise FileNotFoundError(f"Factor CSV not found: {args.input}")
 
-    factor_df = pd.read_csv(args.input)
-    required_cols = {"time", "unique_id", "factor_tag", "value"}
-    missing = required_cols - set(factor_df.columns)
+def load_factor_long_csv(path: str) -> pd.DataFrame:
+    """
+    读取因子长表 CSV，要求列: time, unique_id, factor_tag, value
+    返回 DataFrame，并保证 time 为 datetime、按 (unique_id, factor_tag, time) 排序。
+    """
+    df = pd.read_csv(path)
+    required = {"time", "unique_id", "factor_tag", "value"}
+    missing = required - set(df.columns)
     if missing:
-        raise ValueError(f"Factor CSV missing required columns: {sorted(missing)}")
-    factor_df["time"] = pd.to_datetime(factor_df["time"])
+        raise ValueError(f"因子CSV缺少必要列: {sorted(missing)}")
 
-    coe_cfg = cfg.get("coe", {})
-    start_date = args.start or coe_cfg.get("ric_start_date")
-    end_date = args.end or coe_cfg.get("ric_end_date")
-    start_ts = pd.to_datetime(start_date) if start_date else None
-    end_ts = pd.to_datetime(end_date) if end_date else None
-    if start_ts is not None:
-        factor_df = factor_df[factor_df["time"] >= start_ts]
-    if end_ts is not None:
-        factor_df = factor_df[factor_df["time"] <= end_ts]
-
-    if factor_df.empty:
-        raise ValueError("Filtered factor data is empty; nothing to compute.")
-
-    market = load_market_data(cfg["paths"]["market_data"])
-    close_wide = market["close"].unstack(level=1).sort_index()
-    close_wide = close_wide.ffill().bfill()
-    returns_wide = close_wide.pct_change(1).shift(-1)
-    if start_ts is not None:
-        returns_wide = returns_wide[returns_wide.index >= start_ts]
-    if end_ts is not None:
-        returns_wide = returns_wide[returns_wide.index <= end_ts]
-
-    calc = EfficientCalculator()
-    min_samples = 10
-    ric_records: list[dict] = []
-
-    grouped = factor_df.groupby(["unique_id", "factor_tag"])
-    for (asset_id, factor_tag), group in grouped:
-        if asset_id not in returns_wide.columns:
-            continue
-        factor_series = group.sort_values("time").set_index("time")["value"]
-        returns_series = returns_wide[asset_id]
-        common_dates = factor_series.index.intersection(returns_series.index)
-        if not len(common_dates):
-            continue
-        factor_aligned = factor_series.loc[common_dates]
-        returns_aligned = returns_series.loc[common_dates]
-        valid_mask = ~(factor_aligned.isna() | returns_aligned.isna())
-        factor_clean = factor_aligned[valid_mask]
-        returns_clean = returns_aligned[valid_mask]
-        if len(factor_clean) < min_samples:
-            continue
-        if factor_clean.nunique() <= 1 or returns_clean.nunique() <= 1:
-            continue
-        ric = calc.efficent_cal_ric(factor_clean.values, returns_clean.values)
-        if pd.isna(ric):
-            continue
-        ric_records.append(
-            {
-                "unique_id": asset_id,
-                "factor_tag": factor_tag,
-                "ric": float(ric),
-                "sample_count": len(factor_clean),
-                "start_date": factor_clean.index.min(),
-                "end_date": factor_clean.index.max(),
-            }
-        )
-
-    ric_df = pd.DataFrame(ric_records)
-    if ric_df.empty:
-        raise ValueError("No valid RIC results computed.")
-    ric_df["abs_ric"] = ric_df["ric"].abs()
-    ric_df.sort_values("abs_ric", ascending=False, inplace=True)
-
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    ric_df.to_csv(args.output, index=False)
-    print(f"Saved {len(ric_df)} RIC rows to {args.output}.")
+    df["time"] = pd.to_datetime(df["time"])
+    df = df.sort_values(["unique_id", "factor_tag", "time"]).reset_index(drop=True)
+    return df
 
 
-if __name__ == "__main__":
-    main()
+# 准备因子数据
+factor_df = read_factor_file("/Users/hpy/PycharmProjects/FAMA/factor_value_prepared/data/factors/dsl_factors.parquet")
+
+native_price, price_df, open_price_df, working_days = prepare_price_data(
+    data_path="/Users/hpy/PycharmProjects/FAMA/data/fof_price_updating.parquet"
+)
+
+price_df = price_df.ffill().bfill()
+open_price_df = open_price_df.ffill().bfill()
+zz800 = price_df["000906.SH"]
+tester = NMWBacktester(price_df, fee=0.0002)
+
+pd.set_option("display.max_columns", None)
+factor_df_500_1000 = factor_df[factor_df['unique_id'].isin(['000905.SH', '000852.SH'])]
+# factor_df_500_1000 = factor_df
+
+eff_calc = EfficientCalculator()
+
+# 参数设置
+need_assets = ['000905.SH', '000852.SH']  # 需要计算的资产
+# need_assets = list(price_df.columns)
+start_date = '2015-01-01'
+end_date = '2020-12-31'
+
+# 计算收益率（shift(-1)表示使用未来1日收益率）
+asset_returns = price_df[need_assets].pct_change(1).shift(-1).dropna()
+
+# 存储结果的列表
+ric_results = []
+
+print("开始计算RIC...")
+
+# 筛选时间范围内的数据
+factor_data = factor_df_500_1000.query(
+    "time >= @start_date and time <= @end_date"
+).copy()
+
+# 按 unique_id 和 factor_tag 分组
+grouped = factor_data.groupby(['unique_id', 'factor_tag'])
+
+print(f"共有 {len(grouped)} 个 资产-因子 组合\n")
+
+# 遍历每个组合
+for (asset_id, factor_tag), group in tqdm(grouped, desc="计算RIC"):
+
+    # 获取因子值（按时间排序）
+    factor_series = group.set_index('time')['value'].sort_index()
+
+    # 获取对应的收益率
+    if asset_id not in asset_returns.columns:
+        continue
+
+    returns_series = asset_returns[asset_id]
+
+    # 对齐数据
+    common_dates = factor_series.index.intersection(returns_series.index)
+    factor_aligned = factor_series.loc[common_dates]
+    returns_aligned = returns_series.loc[common_dates]
+
+    # 去除NaN
+    valid_mask = ~(factor_aligned.isna() | returns_aligned.isna())
+    factor_clean = factor_aligned[valid_mask]
+    returns_clean = returns_aligned[valid_mask]
+
+    # 检查样本数量
+    if len(factor_clean) < 10:
+        continue
+
+    # 检查是否为常量
+    if factor_clean.nunique() <= 1 or returns_clean.nunique() <= 1:
+        continue
+
+    # 计算RIC
+    ric = eff_calc.efficent_cal_ric(factor_clean.values, returns_clean.values)
+
+    if not pd.isna(ric):
+        ric_results.append({
+            'unique_id': asset_id,
+            'factor_tag': factor_tag,
+            'ric': ric,
+            'sample_count': len(factor_clean),
+            'start_date': factor_clean.index.min(),
+            'end_date': factor_clean.index.max()
+        })
+
+# 转换为DataFrame
+ric_df = pd.DataFrame(ric_results)
+
+print(f"\n计算完成！共得到 {len(ric_df)} 个有效RIC结果")
+
+# 按RIC绝对值排序
+ric_df['abs_ric'] = ric_df['ric'].abs()
+ric_df = ric_df.sort_values('abs_ric', ascending=False).reset_index(drop=True)
+# 只看关键三列，去掉索引
+ric_df.to_csv("/Users/hpy/PycharmProjects/FAMA/factor_value_prepared/data/factors/factor_ric.csv")

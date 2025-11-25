@@ -16,16 +16,16 @@ run:
   use_coe: true
 paths:
   market_data: "./data/fof_price_updating.parquet"
-  factor_cache: "./data/factor_cache"
+  factor_cache: "/Users/hpy/PycharmProjects/FAMA/data/factor_cache"
   factor_outputs: "./data/factor_values"
   prompts_dir: "./prompts"
   output_dir: "./artifacts"
   factor_ric: "./factor_value_prepared/factor_ric.csv"
 llm:
   provider: "openai"
-  model: "gpt-4o"
-  temperature: 0
-  thinking: "medium"
+  model: "gpt-5"
+  temperature: 1
+  thinking: "high"
   max_new_factors: 20
   instructions_path: "./prompts/alpha_prompt_template.txt"
   api_key_env: "LLM_API_KEY"

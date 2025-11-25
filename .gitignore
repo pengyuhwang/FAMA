@@ -8,9 +8,25 @@ __pycache__/
 artifacts/
 logs/
 .DS_Store
-alphatest
+
 factor_correlation
+
 tmp
 
-factor_value_prepared/factor_values.csv
+factor_value_prepared/data
+factor_value_prepared/factor_ric.csv
+
 data/data_test.ipynb
+data/factor_values
+data/factor_cache
+
+alphatest/data
+alphatest/alphatest
+alphatest/analyze.ipynb
+alphatest/fzq_backtrader_test.ipynb
+alphatest/RankIC-EfficientCalculator.csv
+alphatest/ts_ic_alpha101_1.csv
+
+RankIC/factor_ric.csv
+
+data/factor_values/llm_factors.csv

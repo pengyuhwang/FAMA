@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import runpy
 from pathlib import Path
 from typing import Optional
 import pandas as pd
@@ -39,6 +40,7 @@ class PromptOrchestrator:
 
         self.cfg = cfg
         load_dotenv()
+        self.project_root = Path(__file__).resolve().parents[2]
         self.logger = get_logger(__name__)
         self.market_data = load_market_data(cfg["paths"]["market_data"])
         self.llm_cfg = cfg.get("llm", {})
@@ -87,16 +89,15 @@ class PromptOrchestrator:
             self.coe_manager.ric_start = pd.to_datetime(ric_start)
         if ric_end:
             self.coe_manager.ric_end = pd.to_datetime(ric_end)
-        ric_path = Path(self.cfg["paths"].get("factor_ric", "factor_value_prepared/factor_ric.csv"))
-        if ric_path.exists():
-            try:
-                ric_df = pd.read_csv(ric_path)
-                self.coe_manager.set_precomputed_ric(ric_df)
-                self.logger.info("Loaded precomputed RIC from %s", ric_path)
-            except Exception as exc:
-                self.logger.warning("Failed to load precomputed RIC (%s); will compute on the fly.", exc)
-        else:
-            self.logger.info("Precomputed RIC file %s not found; will compute on the fly.", ric_path)
+        metrics_dir_cfg = self.cfg["paths"].get("factor_metrics_dir")
+        default_metrics = self.project_root / "factor_value_prepared" / "data" / "factors"
+        self.factor_metrics_dir = self._resolve_project_path(Path(metrics_dir_cfg)) if metrics_dir_cfg else default_metrics
+        ric_cfg_path = self.cfg["paths"].get("factor_ric")
+        default_ric_path = self.factor_metrics_dir / "factor_ric.csv"
+        self.ric_output_path = (
+            self._resolve_project_path(Path(ric_cfg_path)) if ric_cfg_path else default_ric_path
+        )
+        self._load_precomputed_ric_files(log_missing=True)
 
     def run(self, use_css: bool = True, use_coe: bool = True) -> list[str]:
         """依据 CSS/CoE 开关执行一次挖掘流程。"""
@@ -133,7 +134,9 @@ class PromptOrchestrator:
         self.logger.info("CSS selecting %d diversified context samples", n_select)
         selections = select_cross_samples(clusters, n_select, seed=seed)
         self.logger.info("CSS selected factor indices: %s", selections)
-        self.coe_manager.rebuild_from_clusters(self.factor_set, self.factor_frame, clusters)
+        if clusters:
+            self._execute_factor_metrics_scripts()
+            self.coe_manager.rebuild_from_clusters(self.factor_set, self.factor_frame, clusters)
         css_examples = []
         selected_pairs: list[str] = []
         for idx in selections:
@@ -156,7 +159,9 @@ class PromptOrchestrator:
         if not self.coe_manager.chains:
             matrix = self.factor_frame.to_numpy(dtype=float)
             clusters, _, _ = cluster_factors_kmeans(matrix, self.cfg.get("k", 8))
-            self.coe_manager.rebuild_from_clusters(self.factor_set, self.factor_frame, clusters)
+            if clusters:
+                self._execute_factor_metrics_scripts()
+                self.coe_manager.rebuild_from_clusters(self.factor_set, self.factor_frame, clusters)
 
         coe_lines = self.coe_manager.format_top_chains()
         if coe_lines:
@@ -214,6 +219,53 @@ class PromptOrchestrator:
             return path / "factors.yaml"
         ensure_dir(str(path.parent))
         return path
+
+    def _resolve_project_path(self, path: Path) -> Path:
+        if path.is_absolute():
+            return path
+        return (self.project_root / path).resolve()
+
+    def _execute_factor_metrics_scripts(self) -> None:
+        modules = [
+            ("factor_value_prepared.compute_factor_values", "计算因子值"),
+            ("factor_value_prepared.compute_ric", "计算 RankIC"),
+        ]
+        for module, desc in modules:
+            self.logger.info("运行 %s（%s）...", module, desc)
+            try:
+                runpy.run_module(module, run_name="__main__")
+            except Exception:
+                self.logger.exception("执行 %s 失败，终止 CoE 构建。", module)
+                raise
+        if not self._load_precomputed_ric_files(log_missing=False):
+            self.logger.warning("脚本执行完成但未找到最新的 RIC 文件，CoE 将无法使用预计算分数。")
+
+    def _load_precomputed_ric_files(self, log_missing: bool = True) -> bool:
+        candidates: list[Path] = []
+        if self.ric_output_path:
+            candidates.append(self.ric_output_path)
+        default_candidate = self.factor_metrics_dir / "factor_ric.csv"
+        if not candidates or default_candidate not in candidates:
+            candidates.append(default_candidate)
+        loaded = False
+        for path in candidates:
+            if not path.exists():
+                continue
+            try:
+                ric_df = pd.read_csv(path)
+            except Exception as exc:
+                self.logger.warning("读取预计算 RIC 失败（%s）：%s", path, exc)
+                continue
+            self.coe_manager.set_precomputed_ric(ric_df)
+            self.logger.info("已加载预计算 RIC：%s", path)
+            loaded = True
+            break
+        if not loaded:
+            if log_missing:
+                joined = ", ".join(str(p) for p in candidates)
+                self.logger.info("未找到预计算 RIC 文件，尝试路径：%s", joined)
+            self.coe_manager.set_precomputed_ric(None)
+        return loaded
 
     def _load_factor_set(self) -> FactorSet:
         if self.factor_repo.exists():

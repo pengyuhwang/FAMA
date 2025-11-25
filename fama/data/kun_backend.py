@@ -98,7 +98,10 @@ def _register_ops():
 
     DSL_FUNCTIONS.update(
         {
-            "RANK": lambda x: Rank(x),
+            "RANK": lambda x: AddConst(
+                OpMul(Rank(_ensure_expression(x)), ConstantOp(9.0)),
+                1.0,
+            ),
             "DELTA": lambda x, n: OpSub(x, BackRef(x, _to_int(n))),
             "TS_MEAN": lambda x, n: WindowedAvg(x, _to_int(n)),
             "TS_STDDEV": lambda x, n: WindowedStddev(x, _to_int(n)),
@@ -197,8 +200,8 @@ def compute_factor_values_kunquant(
     module = lib.getModule("fama_graph")
     executor = kr.createMultiThreadExecutor(max(1, int(threads)))
     first = next(iter(inputs_np.values()))
-    num_stocks = first.shape[0]
-    length = first.shape[1]
+    length = first.shape[0]
+    num_stocks = first.shape[1]
     out = kr.runGraph(
         executor,
         module,
@@ -260,9 +263,9 @@ def _eval_ast(node: ast.AST, env: Dict[str, Input]):
         if isinstance(node.op, ast.Mult):
             return OpMul(left, right)
         if isinstance(node.op, ast.Div):
-            return OpDiv(left, right)
+            return _safe_div(left, right)
         if isinstance(node.op, ast.Pow):
-            return left ** right
+            return _power_expr(left, right)
         raise NotImplementedError(f"Unsupported operator {node.op}")
     if isinstance(node, ast.UnaryOp):
         operand = _eval_ast(node.operand, env)
@@ -291,6 +294,42 @@ def _eval_ast(node: ast.AST, env: Dict[str, Input]):
     raise NotImplementedError(f"Unsupported AST node {ast.dump(node)}")
 
 
+def _power_expr(base, exponent):
+    base_expr = _ensure_expr(base)
+    exp_value = _extract_constant(exponent)
+    if exp_value is None:
+        exponent_expr = _ensure_expr(exponent)
+        return _signed_power(base_expr, exponent_expr)
+    if abs(exp_value) < 1e-12:
+        return ConstantOp(1.0)
+    if abs(exp_value - 1.0) < 1e-12:
+        return base_expr
+    if float(exp_value).is_integer():
+        n = int(round(exp_value))
+        if n < 0:
+            raise NotImplementedError("Negative exponents are not supported.")
+        result = base_expr
+        for _ in range(n - 1):
+            result = OpMul(result, base_expr)
+        return result
+    exponent_expr = ConstantOp(float(exp_value))
+    return _signed_power(base_expr, exponent_expr)
+
+
+def _ensure_expr(value):
+    if isinstance(value, (int, float)):
+        return ConstantOp(float(value))
+    return value
+
+
+def _extract_constant(value):
+    if isinstance(value, ConstantOp):
+        return float(value.attrs.get("value", 0.0))
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
+
+
 def _to_int(value):
     if isinstance(value, ConstantOp):
         return int(value.attrs.get("value", 0))
@@ -301,6 +340,27 @@ def _to_float(value):
     if isinstance(value, ConstantOp):
         return float(value.attrs.get("value", 0.0))
     return float(value)
+
+
+def _safe_div(numerator, denominator, eps: float = 1e-7):
+    return OpDiv(_ensure_expr(numerator), _ensure_expr(denominator))
+
+
+def _signed_power(base_expr, exponent_expr):
+    base_expr = _ensure_expr(base_expr)
+    exponent_expr = _ensure_expr(exponent_expr)
+    abs_base = OpAbs(base_expr)
+    safe_base = OpMax(abs_base, ConstantOp(1e-6))
+    magnitude = OpExp(OpMul(exponent_expr, OpLog(safe_base)))
+    if OpSign is not None:
+        sign = OpSign(base_expr)
+    else:
+        sign = Select(
+            OpGreaterThan(base_expr, ConstantOp(0.0)),
+            ConstantOp(1.0),
+            ConstantOp(-1.0),
+        )
+    return OpMul(sign, magnitude)
 
 
 def _build_ts_inputs(mkt_df: pd.DataFrame) -> Tuple[Dict[str, np.ndarray], List[pd.Timestamp], List[str]]:
@@ -319,7 +379,8 @@ def _build_ts_inputs(mkt_df: pd.DataFrame) -> Tuple[Dict[str, np.ndarray], List[
             continue
         slice_df = mkt_df[col].unstack(level=1)
         slice_df = slice_df.reindex(index=dates, columns=symbols)
-        inputs[alias] = slice_df.to_numpy(dtype=np.float32).T
+        arr = slice_df.to_numpy(dtype=np.float32)
+        inputs[alias] = np.ascontiguousarray(arr)
 
     missing = [field for field in FIELD_MAP.values() if field not in inputs]
     if missing:
