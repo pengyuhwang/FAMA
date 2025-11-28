@@ -68,6 +68,8 @@ def _expr_for_op(op, memo: Dict[int, str]) -> str:
         expr = f"({child(0)} - {_format_constant(attrs['value'])})"
     elif cls == "DivConst":
         expr = f"({child(0)} / {_format_constant(attrs['value'])})"
+    elif cls == "Clip":
+        expr = f"CLIP({child(0)}, {_format_constant(attrs.get('value', 0.0))})"
     elif cls == "Rank":
         expr = f"RANK({child(0)})"
     elif cls == "WindowedAvg":
@@ -78,6 +80,14 @@ def _expr_for_op(op, memo: Dict[int, str]) -> str:
         expr = f"CORREL({child(0)}, {child(1)}, {attrs['window']})"
     elif cls == "WindowedCovariance":
         expr = f"COVAR({child(0)}, {child(1)}, {attrs['window']})"
+    elif cls == "WindowedQuantile":
+        expr = f"TS_QUANTILE({child(0)}, {attrs['window']}, {_format_constant(attrs['q'])})"
+    elif cls == "WindowedLinearRegressionRSqaure":
+        expr = f"TS_LINEAR_REGRESSION_R2({child(0)}, {attrs['window']})"
+    elif cls == "WindowedLinearRegressionResi":
+        expr = f"TS_LINEAR_REGRESSION_RESI({child(0)}, {attrs['window']})"
+    elif cls == "WindowedLinearRegressionSlope":
+        expr = f"TS_LINEAR_REGRESSION_SLOPE({child(0)}, {attrs['window']})"
     elif cls == "TsRank":
         expr = f"TS_RANK({child(0)}, {attrs['window']})"
     elif cls == "WindowedSum":

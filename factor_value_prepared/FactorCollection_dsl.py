@@ -11,7 +11,7 @@ import pandas as pd
 
 from factor_value_prepared.FactorCollection import FactorCollection
 from fama.data.factor_space import deserialize_factor_set
-from fama.data.kun_backend import compute_factor_values_kunquant
+from fama.data.kun_backend_new import compute_factor_values_kunquant_new
 
 
 class FactorCollectionDSL(FactorCollection):
@@ -45,7 +45,7 @@ class FactorCollectionDSL(FactorCollection):
 
         market_df = self._build_market_frame()
         kun_threads = threads if threads is not None else int(cfg.get("compute", {}).get("threads", 4))
-        kun_df, fallback = compute_factor_values_kunquant(
+        kun_df, fallback = compute_factor_values_kunquant_new(
             market_df,
             expressions,
             threads=kun_threads,

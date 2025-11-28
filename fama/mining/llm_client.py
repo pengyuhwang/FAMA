@@ -21,6 +21,7 @@ def request_new_factors(
     api_key: str | None = None,
     temperature: float | None = None,
     thinking: str | None = None,
+    base_url: str | None = None,
     allowed_fields: list[str] | None = None,
     logger=None,
 ) -> list[str]:
@@ -28,11 +29,12 @@ def request_new_factors(
 
     Args:
         prompt: 编排器构造的提示词。
-        provider: defaults.yaml 中的服务商标识，目前支持 ``openai``。
+        provider: defaults.yaml 中的服务商标识，目前支持 ``openai``、``siliconflow``（DeepSeek 模型）。
         model: 目标模型名称。
         api_key: API 密钥，缺失时将使用回退逻辑。
         temperature: 采样温度，会直接传递给 OpenAI 接口。
         thinking: reasoning/“thinking”力度设置。
+        base_url: 可选自定义 API 基础地址（例如 SiliconFlow 的 OpenAI 兼容端点）。
         allowed_fields: 允许引用的字段列表，用于 fallback 生成时保障安全。
         logger: 可选日志记录器，用于输出原始响应。
 
@@ -40,35 +42,38 @@ def request_new_factors(
         因子表达式列表；没有密钥或 SDK 不可用时退回确定性样本。
     """
 
-    if provider.lower() != "openai":
-        return _fallback_generation(prompt, allowed_fields, logger)
+    provider_l = provider.lower()
+    # OpenAI 兼容分支：原生 OpenAI 或 SiliconFlow/OpenRouter 之类的兼容接口
+    if provider_l in {"openai", "siliconflow", "deepseek"}:
+        if OpenAI is None:
+            raise RuntimeError(
+                "未安装 openai SDK，无法调用真实 LLM。请 `pip install openai` 或提供其他提供商。"
+            )
+        client = OpenAI(api_key=api_key, base_url=base_url) if base_url else OpenAI(api_key=api_key)
+        try:
+            resp = client.chat.completions.create(
+                model=model,
+                temperature=float(temperature or 0.2),
+                messages=[
+                    {"role": "system", "content": "You are a quant researcher. Return one alpha per line."},
+                    {"role": "user", "content": prompt},
+                ],
+            )
+        except Exception as exc:  # pragma: no cover - 网络/SDK 异常
+            if logger is not None:
+                logger.warning("LLM call failed (%s); falling back to deterministic output.", exc)
+            return _fallback_generation(prompt, allowed_fields, logger)
+        content = (resp.choices[0].message.content or "").strip()
+        if logger is not None:
+            logger.info("LLM raw output: %s", content)
+        return parse_llm_output(content)
+
+    # 未知 provider 走可重复的伪造输出
     if OpenAI is None:
         raise RuntimeError(
             "未安装 openai SDK，无法调用真实 LLM。请 `pip install openai` 或提供其他提供商。"
         )
-    effective_key = api_key or os.getenv("OPENAI_API_KEY")
-    if not effective_key:
-        return _fallback_generation(prompt, allowed_fields, logger)
-
-    client = OpenAI(api_key=effective_key)
-    # ✅ 使用 Chat Completions；不要传 reasoning 参数
-    try:
-        resp = client.chat.completions.create(
-            model=model,  # 例如 "gpt-4o-mini"
-            temperature=float(temperature or 0.2),
-            messages=[
-                {"role": "system", "content": "You are a quant researcher. Return one alpha per line."},
-                {"role": "user", "content": prompt},
-            ],
-        )
-    except Exception as exc:  # pragma: no cover - 网络/SDK 异常
-        if logger is not None:
-            logger.warning("LLM call failed (%s); falling back to deterministic output.", exc)
-        return _fallback_generation(prompt, allowed_fields, logger)
-    content = (resp.choices[0].message.content or "").strip()
-    if logger is not None:
-        logger.info("LLM raw output: %s", content)
-    return parse_llm_output(content)
+    return _fallback_generation(prompt, allowed_fields, logger)
 
 
 def _fallback_generation(prompt: str, allowed_fields: list[str] | None = None, logger=None) -> list[str]:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import runpy
 from pathlib import Path
 from typing import Optional
@@ -56,10 +57,13 @@ class PromptOrchestrator:
         if deny_fields:
             self.logger.info("生效字段（过滤 deny 列表后）: %s", ", ".join(self.prompt_allowed_fields))
         self.factor_repo = self._resolve_factor_repo()
+        self.llm_factor_repo = self._resolve_llm_factor_repo()
         self.factor_output_dir = Path(self.cfg["paths"].get("factor_outputs", "./data/factor_values"))
         ensure_dir(str(self.factor_output_dir))
         self.factor_set = self._load_factor_set()
-        self._sanitize_factor_set()
+        self.llm_factor_set = self._load_llm_factor_set()
+        self._sanitize_factor_sets()
+        self.base_factor_count = len(self.factor_set.factors)
         self.factor_frame = compute_factor_values(
             self.market_data,
             [factor.expression for factor in self.factor_set.factors],
@@ -208,6 +212,7 @@ class PromptOrchestrator:
                 api_key=api_key,
                 temperature=temperature,
                 thinking=thinking,
+                base_url=llm_cfg.get("base_url"),
                 allowed_fields=self.prompt_allowed_fields,
                 logger=self.logger,
             )
@@ -217,6 +222,14 @@ class PromptOrchestrator:
         if path.is_dir():
             ensure_dir(str(path))
             return path / "factors.yaml"
+        ensure_dir(str(path.parent))
+        return path
+
+    def _resolve_llm_factor_repo(self) -> Path:
+        path = Path(self.cfg["paths"].get("llm_factor_cache", "./data/factor_cache_new/LLM_factors.yaml"))
+        if path.is_dir():
+            ensure_dir(str(path))
+            return path / "LLM_factors.yaml"
         ensure_dir(str(path.parent))
         return path
 
@@ -283,10 +296,25 @@ class PromptOrchestrator:
         serialize_factor_set(factor_set, str(self.factor_repo))
         return factor_set
 
+    def _load_llm_factor_set(self) -> FactorSet:
+        if self.llm_factor_repo.exists():
+            return deserialize_factor_set(str(self.llm_factor_repo))
+        ensure_dir(str(self.llm_factor_repo.parent))
+        serialize_factor_set(FactorSet([]), str(self.llm_factor_repo))
+        return FactorSet([])
+
     def _update_factor_set(self, expressions: list[dict]) -> None:
-        start_idx = len(self.factor_set.factors)
+        pattern = re.compile(r"LLM_Factor(\d+)$")
+        existing_suffixes = {
+            int(match.group(1))
+            for factor in self.llm_factor_set.factors
+            for match in [pattern.match(factor.name)]
+            if match
+        }
+        counter = max(existing_suffixes, default=self.base_factor_count)
+        used_suffixes = set(existing_suffixes)
         accepted_factors: list[Factor] = []
-        for offset, item in enumerate(expressions):
+        for item in expressions:
             expr = (item.get("expression") if isinstance(item, dict) else None) or ""
             expr = expr.strip()
             if not validate_alpha_syntax(
@@ -296,16 +324,21 @@ class PromptOrchestrator:
             ):
                 self.logger.warning("Skipping invalid expression: %s", expr)
                 continue
-            name = f"LLM_Factor{start_idx + offset + 1}"
+            counter += 1
+            while counter in used_suffixes:
+                counter += 1
+            used_suffixes.add(counter)
+            name = f"LLM_Factor{counter}"
             explanation = None
             if isinstance(item, dict):
                 expl = item.get("explanation")
                 if isinstance(expl, str):
                     explanation = expl.strip() or None
             factor_obj = Factor(name=name, expression=expr, explanation=explanation)
-            self.factor_set.factors.append(factor_obj)
+            self.llm_factor_set.factors.append(factor_obj)
             accepted_factors.append(factor_obj)
-        serialize_factor_set(self.factor_set, str(self.factor_repo))
+        if accepted_factors:
+            serialize_factor_set(self.llm_factor_set, str(self.llm_factor_repo))
         self.factor_frame = compute_factor_values(
             self.market_data,
             [factor.expression for factor in self.factor_set.factors],
@@ -326,23 +359,35 @@ class PromptOrchestrator:
         fallback = [f"RANK({field})" for field in self.available_fields[:5]]
         return fallback or ["RANK(VWAP)"]
 
-    def _sanitize_factor_set(self) -> None:
-        valid = [
-            factor
-            for factor in self.factor_set.factors
-            if validate_alpha_syntax(
-                factor.expression,
-                self.allowed_variables,
-                allowed_ops=None,
-            )
-        ]
-        if len(valid) != len(self.factor_set.factors):
-            self.logger.warning("检测到不兼容的因子，已自动清理。")
-            self.factor_set = FactorSet(valid or [
+    def _sanitize_factor_sets(self) -> None:
+        def _sanitize(factors: list[Factor]) -> list[Factor]:
+            return [
+                factor
+                for factor in factors
+                if validate_alpha_syntax(
+                    factor.expression,
+                    self.allowed_variables,
+                    allowed_ops=None,
+                )
+            ]
+
+        base_valid = _sanitize(self.factor_set.factors)
+        if len(base_valid) != len(self.factor_set.factors):
+            self.logger.warning("基础因子库含有不兼容表达式，已自动清理。")
+        if not base_valid:
+            base_valid = [
                 Factor(name=f"seed_{idx+1}", expression=expr)
                 for idx, expr in enumerate(self._bootstrap_seed_expressions())
-            ])
-            serialize_factor_set(self.factor_set, str(self.factor_repo))
+            ]
+        self.factor_set = FactorSet(base_valid)
+        serialize_factor_set(self.factor_set, str(self.factor_repo))
+        self.base_factor_count = len(self.factor_set.factors)
+
+        llm_valid = _sanitize(self.llm_factor_set.factors)
+        if len(llm_valid) != len(self.llm_factor_set.factors):
+            self.logger.warning("LLM 因子库含有不兼容表达式，已自动清理。")
+        self.llm_factor_set = FactorSet(llm_valid)
+        serialize_factor_set(self.llm_factor_set, str(self.llm_factor_repo))
 
     def _persist_factor_series(self, factors: list[Factor]) -> None:
         if not factors:

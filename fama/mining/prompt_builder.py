@@ -9,7 +9,7 @@ from typing import Iterable, List
 from fama.factors.opcards import render_cards
 
 OPS_REGEX = re.compile(
-    r"\b(RANK|DELTA|DELAY|TS_MEAN|TS_SUM|TS_STDDEV|TS_MIN|TS_MAX|TS_PRODUCT|TS_ARGMAX|TS_ARGMIN|TS_RANK|CORREL|COVAR|Z_SCORE|SIGN|ABS|DECAY_LINEAR|SCALE|IF|GT|GE|LT|LE|EQ|REPLACE_NAN_INF)\b"
+    r"\b(RANK|DELTA|DELAY|TS_MEAN|TS_SUM|TS_STDDEV|TS_MIN|TS_MAX|TS_PRODUCT|TS_ARGMAX|TS_ARGMIN|TS_RANK|CORREL|COVAR|SIGN|ABS|DECAY_LINEAR|SCALE|IF|AND|OR|NOT|GT|GE|LT|LE|EQ|REPLACE_NAN_INF|ADV|SAFE_DIV|CLIP|EMA|EXP_MOVING_AVG|FAST_TS_SUM|TS_QUANTILE|TS_KURT|TS_SKEW|TS_MAXDRAWDOWN|TS_LINEAR_REGRESSION_R2|TS_LINEAR_REGRESSION_SLOPE|TS_LINEAR_REGRESSION_RESI|DIFF_WITH_WEIGHTED_SUM|LOG|EXP|POW|MAX|MIN)\b"
 )
 
 
@@ -67,7 +67,7 @@ def build_prompt(
       - 直接复刻这些表达式；
       - 只对其做参数级的小改动；
       - 简单线性组合多个 CSS 示例因子。
-    - 目标：在这些“低相关强风格”的启发下，构造**在风格上有差异、与当前因子库整体相关性更低**的新因子。
+    - 目标：在这些“低相关强风格”的启发下，构造**在风格上有差异、与当前因子库整体相关性更低**的新因子，生成的因子公式在经济学意义上也尽量与示例错开，避免高相关性。
 
     # CSS 示例（跨簇低相关的代表性因子）
     {css_block}
@@ -81,7 +81,8 @@ def build_prompt(
       - 在此基础上进行进一步**结构创新**，提出有望在该簇中取得更高 RankIC 的新变体。
     - 同时要注意：
       - 新因子不能只是链尾因子的微小改写；
-      - 在全局上也应与当前因子库保持较低相关性。
+      - 在全局上也应与当前因子库保持较低相关性；
+      - 生成的因子公式在经济学意义上也尽量与示例错开，避免高相关性。
 
     # Chain-of-Experience（同簇内按 RankIC 由弱到强的经验链）
     {coe_block}

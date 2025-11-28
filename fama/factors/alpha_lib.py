@@ -269,6 +269,60 @@ def _ts_rank(series: "pd.Series", window: int) -> "pd.Series":
     )
 
 
+def _ts_quantile(series: "pd.Series", window: int, q: float) -> "pd.Series":
+    return series.groupby(level=1, group_keys=False).apply(
+        lambda s: s.rolling(window, min_periods=1).quantile(q)
+    )
+
+
+def _ts_linear_regression(series: "pd.Series", window: int) -> tuple["pd.Series", "pd.Series", "pd.Series"]:
+    """Return slope, r2, residual (last point) for rolling linear regression on time index."""
+
+    def calc(values: np.ndarray):
+        mask = ~np.isnan(values)
+        if mask.sum() < 2:
+            return (np.nan, np.nan, np.nan)
+        y = values[mask]
+        x = np.arange(len(values))[mask].astype(float)
+        x_mean = x.mean()
+        y_mean = y.mean()
+        denom = np.sum((x - x_mean) ** 2)
+        if denom == 0:
+            return (np.nan, np.nan, np.nan)
+        slope = float(np.sum((x - x_mean) * (y - y_mean)) / denom)
+        intercept = float(y_mean - slope * x_mean)
+        pred = slope * x + intercept
+        ss_tot = np.sum((y - y_mean) ** 2)
+        ss_res = np.sum((y - pred) ** 2)
+        r2 = float(1 - ss_res / ss_tot) if ss_tot != 0 else np.nan
+        resi = float(y[-1] - pred[-1])
+        return (slope, r2, resi)
+
+    def apply_fn(s: "pd.Series") -> "pd.DataFrame":
+        rolled = s.rolling(window, min_periods=2).apply(lambda v: calc(v)[0], raw=True)
+        r2 = s.rolling(window, min_periods=2).apply(lambda v: calc(v)[1], raw=True)
+        resi = s.rolling(window, min_periods=2).apply(lambda v: calc(v)[2], raw=True)
+        return pd.DataFrame({"slope": rolled, "r2": r2, "resi": resi}, index=s.index)
+
+    grouped = series.groupby(level=1, group_keys=False).apply(apply_fn)
+    return (grouped["slope"], grouped["r2"], grouped["resi"])
+
+
+def _ts_linear_regression_slope(series: "pd.Series", window: int) -> "pd.Series":
+    slope, _, _ = _ts_linear_regression(series, window)
+    return slope
+
+
+def _ts_linear_regression_r2(series: "pd.Series", window: int) -> "pd.Series":
+    _, r2, _ = _ts_linear_regression(series, window)
+    return r2
+
+
+def _ts_linear_regression_resi(series: "pd.Series", window: int) -> "pd.Series":
+    _, _, resi = _ts_linear_regression(series, window)
+    return resi
+
+
 def _correl(x: "pd.Series", y: "pd.Series", window: int) -> "pd.Series":
     joined = x.to_frame("x").join(y.to_frame("y"))
     grouped = joined.groupby(level=1, group_keys=False)
@@ -404,6 +458,10 @@ def _replace_nan_inf(series: "pd.Series", value: float = 0.0) -> "pd.Series":
     return series.replace([np.inf, -np.inf], np.nan).fillna(value)
 
 
+def _clip(series: "pd.Series", eps: float = 1.0) -> "pd.Series":
+    return series.clip(lower=-eps, upper=eps)
+
+
 __all__ = [
     "parse_symbolic_expression",
     "list_seed_alphas",
@@ -426,6 +484,10 @@ _ALLOWED_FUNCTIONS: Dict[str, Callable[..., Any]] = {
     "TS_ARGMAX": _ts_argmax,
     "TS_ARGMIN": _ts_argmin,
     "TS_RANK": _ts_rank,
+    "TS_QUANTILE": _ts_quantile,
+    "TS_LINEAR_REGRESSION_R2": _ts_linear_regression_r2,
+    "TS_LINEAR_REGRESSION_RESI": _ts_linear_regression_resi,
+    "TS_LINEAR_REGRESSION_SLOPE": _ts_linear_regression_slope,
     "CORREL": _correl,
     "COVAR": _covar,
     "Z_SCORE": _z_score,
@@ -447,6 +509,7 @@ _ALLOWED_FUNCTIONS: Dict[str, Callable[..., Any]] = {
     "LOG": _log,
     "EXP": _exp,
     "REPLACE_NAN_INF": _replace_nan_inf,
+    "CLIP": _clip,
 }
 
 _BASE_VARIABLES = {

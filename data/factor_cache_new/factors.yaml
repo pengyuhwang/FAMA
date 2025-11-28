@@ -2,393 +2,1039 @@
   expression: RANK(TS_ARGMAX((IF(LT(((CLOSE / DELAY(CLOSE, 1)) - 1), 0), TS_STDDEV(((CLOSE
     / DELAY(CLOSE, 1)) - 1), 20), CLOSE) * IF(LT(((CLOSE / DELAY(CLOSE, 1)) - 1),
     0), TS_STDDEV(((CLOSE / DELAY(CLOSE, 1)) - 1), 20), CLOSE)), 5))
-  explanation: null
+  explanation: 在近5日内定位“下跌日用20日波动率、非下跌日用价格”的极值出现时点并做横截面排序，从而反映个股近期风险冲击或价格强势的时新性，体现对短期情绪与动量的暴露。
 - name: alpha002
   expression: REPLACE_NAN_INF((CORREL(RANK((LOG(VOLUME) - DELAY(LOG(VOLUME), 2))),
     RANK(((CLOSE - OPEN) / OPEN)), 6) * -1), 0)
-  explanation: null
+  explanation: 该因子为近6期“两日对数成交量变化”的秩与“开收盘收益”的秩相关系数取负，反映成交量加速度与日内收益的逆向关系强弱，值越大表明放量更常伴随日内走弱（卖压占优）。
 - name: alpha003
   expression: REPLACE_NAN_INF((CORREL(RANK(OPEN), RANK(VOLUME), 10) * -1), 0)
-  explanation: null
+  explanation: 该因子取过去10日开盘价与成交量的秩相关性之相反数（异常置零），反映价量关系：价量同向越强因子越低（需求与流动性共振、趋势更可延续），价量背离越强因子越高（量能不足或情绪分歧、存在反转风险）。
 - name: alpha004
   expression: (TS_RANK(RANK(LOW), 9) * -1)
-  explanation: null
+  explanation: 该因子对个股日内最低价在全市场的横截面排名做9日时序排名并取反，刻画近期低点相对越低得分越高，从而押注短期超跌后的均值回归反弹。
 - name: alpha005
   expression: (RANK((OPEN - (TS_SUM((AMOUNT / (VOLUME + 1e-07)), 10) / 10))) * (ABS(RANK((CLOSE
     - (AMOUNT / (VOLUME + 1e-07))))) * -1))
-  explanation: null
+  explanation: 以开盘价相对近10日均值成交价的偏离与收盘价相对当日VWAP的强弱相乘并取反，刻画由流动性与过度反应导致的短期价差，偏好开低收弱、反之做空的均值回归信号。
 - name: alpha006
   expression: REPLACE_NAN_INF((CORREL(OPEN, VOLUME, 10) * -1), 0)
-  explanation: null
+  explanation: 该因子度量近10日开盘价与成交量的负相关性（异常值记为0），数值越大意味着涨价缩量或跌价放量更明显，反映价格变动与交易参与度的背离程度。
 - name: alpha007
   expression: IF(GE(TS_MEAN(VOLUME, 20), VOLUME), -1, ((TS_RANK(ABS((CLOSE - DELAY(CLOSE,
     7))), 60) * SIGN((CLOSE - DELAY(CLOSE, 7)))) * -1))
-  explanation: null
+  explanation: 该因子在成交量高于20日均量时对近7日大幅涨跌进行反向押注（越极端越强），在成交量低于均量时保持做空，从而捕捉高流动性下的短期均值回归。
 - name: alpha008
   expression: (RANK(((TS_SUM(OPEN, 5) * TS_SUM(((CLOSE / DELAY(CLOSE, 1)) - 1), 5))
     - DELAY((TS_SUM(OPEN, 5) * TS_SUM(((CLOSE / DELAY(CLOSE, 1)) - 1), 5)), 10)))
     * -1)
-  explanation: null
+  explanation: 该因子取“近5日开盘价总和×近5日累计收益”相对10日前的变化并取反排序，反映短期动能变化的逆向信号。
 - name: alpha009
   expression: IF(OR(GT(TS_MIN((CLOSE - DELAY(CLOSE, 1)), 5), 0), LT(TS_MAX((CLOSE
     - DELAY(CLOSE, 1)), 5), 0)), (CLOSE - DELAY(CLOSE, 1)), ((CLOSE - DELAY(CLOSE,
     1)) * -1))
-  explanation: null
+  explanation: 该因子根据近5日是否单边上涨或下跌来决定对当日价差顺势或反向处理，意在趋势期捕捉动量溢价、震荡期博取均值回归收益。
 - name: alpha010
   expression: IF(OR(GT(TS_MIN((CLOSE - DELAY(CLOSE, 1)), 4), 0), LT(TS_MAX((CLOSE
     - DELAY(CLOSE, 1)), 4), 0)), (CLOSE - DELAY(CLOSE, 1)), ((CLOSE - DELAY(CLOSE,
     1)) * -1))
-  explanation: null
+  explanation: 该因子根据过去4日收益是否同向（全正或全负）来识别单边或震荡行情：单边时顺势采用当日收益，非单边时反向取值，从而在趋势期捕捉动量、在震荡期博取均值回归。
 - name: alpha011
   expression: ((RANK(TS_MAX(((AMOUNT / (VOLUME + 1e-07)) - CLOSE), 3)) + RANK(TS_MIN(((AMOUNT
     / (VOLUME + 1e-07)) - CLOSE), 3))) * RANK((VOLUME - DELAY(VOLUME, 3))))
-  explanation: null
+  explanation: 该因子通过度量近3日成交均价（AMOUNT/VOLUME）相对收盘价的极端偏离并叠加三日成交量变动，刻画资金冲击与短期价格压力的强弱，提示流动性驱动的价格偏离及潜在的短期均值回归或波动加剧。
 - name: alpha012
   expression: (SIGN((VOLUME - DELAY(VOLUME, 1))) * ((CLOSE - DELAY(CLOSE, 1)) * -1))
-  explanation: null
+  explanation: 该因子以成交量变动方向乘以价格变动的相反数来衡量量价背离：量增价跌或量减价涨为正、暗示走势缺乏量能确认且可能反转；量价同向为负、趋势更可信。
 - name: alpha013
   expression: (RANK(COVAR(RANK(CLOSE), RANK(VOLUME), 5)) * -1)
-  explanation: null
+  explanation: 该因子以近5日收盘价与成交量的秩协方差为基础并取反，数值越大表示价量短期负协动（价涨量缩或价跌量增）越强，反映对价量背离及潜在短期反转/流动性压力的敞口。
 - name: alpha014
   expression: ((RANK((((CLOSE / DELAY(CLOSE, 1)) - 1) - DELAY(((CLOSE / DELAY(CLOSE,
     1)) - 1), 3))) * REPLACE_NAN_INF(CORREL(OPEN, VOLUME, 10), 0)) * -1)
-  explanation: null
+  explanation: 该因子以“当日收益减去3日前收益”衡量短期收益加速度，并用近10日开盘价与成交量的相关性刻画开盘资金冲击强度后取负秩，旨在捕捉资金驱动的短期过度反应并博取随后的反转。
 - name: alpha015
   expression: (TS_SUM(RANK(REPLACE_NAN_INF(CORREL(RANK(HIGH), RANK(VOLUME), 3), 0)),
     3) * -1)
-  explanation: null
+  explanation: 该因子刻画“价强是否得量能配合”：以近3日最高价与成交量的相关性做横截面排序并在3日内累加后取反，值越低表示价高量增、动能被成交量确认，值越高提示价量背离、上涨缺乏资金支撑。
 - name: alpha016
   expression: (RANK(COVAR(RANK(HIGH), RANK(VOLUME), 5)) * -1)
-  explanation: null
+  explanation: 通过近5日最高价与成交量排名的协方差刻画价量共振，取负后偏好价量背离、回避交易热度过高的标的。
 - name: alpha017
   expression: (((RANK(TS_RANK(CLOSE, 10)) * RANK(((CLOSE - DELAY(CLOSE, 1)) - DELAY((CLOSE
     - DELAY(CLOSE, 1)), 1)))) * RANK(TS_RANK(REPLACE_NAN_INF((VOLUME / TS_MEAN(VOLUME,
     20)), 0), 5))) * -1)
-  explanation: null
+  explanation: 该因子将近10日价格位序、日度收益加速度与相对20日均量的近5日放量强度相乘后取负，旨在对高位放量加速行情进行逆向押注以捕捉由情绪过度与价格压力引发的短期均值回归。
 - name: alpha018
   expression: (RANK(((TS_STDDEV(ABS((CLOSE - OPEN)), 5) + (CLOSE - OPEN)) + REPLACE_NAN_INF(CORREL(CLOSE,
     OPEN, 10), 0))) * -1)
-  explanation: null
+  explanation: 该因子将近5日绝对开收差的波动度、当日开收价差与近10日开收价相关性相加后反向排序，偏好当日盘内走弱且盘内波动更稳定、开收联动性较低的个股，意在捕捉盘内弱势的均值回归。
 - name: alpha019
   expression: ((SIGN(((CLOSE - DELAY(CLOSE, 7)) + (CLOSE - DELAY(CLOSE, 7)))) * -1)
     * (RANK((TS_SUM(((CLOSE / DELAY(CLOSE, 1)) - 1), 250) + 1)) + 1))
-  explanation: null
+  explanation: 该因子对近7日价格变化取反，并按过去250日累计收益的截面排名加权，意在在长期强势个股上放大短期均值回归效应（买回调、卖反弹）。
 - name: alpha020
   expression: (((RANK((OPEN - DELAY(HIGH, 1))) * RANK((OPEN - DELAY(CLOSE, 1)))) *
     RANK((OPEN - DELAY(LOW, 1)))) * -1)
-  explanation: null
+  explanation: 该因子比较当日开盘价相对昨日高/收/低的相对强弱并取反，刻画隔夜情绪导致的开盘过度定价，旨在捕捉“开盘强则易回落、开盘弱则易反弹”的短期均值回归收益。
 - name: alpha021
   expression: IF(AND(NOT(LT((TS_MEAN(CLOSE, 8) + TS_STDDEV(CLOSE, 8)), TS_MEAN(CLOSE,
     2))), OR(LT(TS_MEAN(CLOSE, 2), (TS_MEAN(CLOSE, 8) - TS_STDDEV(CLOSE, 8))), GE((VOLUME
     / TS_MEAN(VOLUME, 20)), 1))), 1, -1)
-  explanation: null
+  explanation: 该因子在短期价格未显著高于8日均线+1倍标准差时，若成交量不低于20日均值或价格显著跌破8日均线−1倍标准差则做多，体现带流动性约束的短期均值回归偏好并规避追涨。
 - name: alpha022
   expression: (((REPLACE_NAN_INF(CORREL(HIGH, VOLUME, 5), 0) - DELAY(REPLACE_NAN_INF(CORREL(HIGH,
     VOLUME, 5), 0), 5)) * -1) * RANK(TS_STDDEV(CLOSE, 20)))
-  explanation: null
+  explanation: 该因子以近5日高价与成交量相关性相对5日前的下降幅度（取反）为信号，并用20日收盘波动率的横截面排名放大，旨在捕捉价量配合走弱且高波动个股的动能衰减与回调风险。
 - name: alpha023
   expression: IF(LT(TS_MEAN(HIGH, 20), HIGH), (REPLACE_NAN_INF((HIGH - DELAY(HIGH,
     2)), 0) * -1), 0)
-  explanation: null
+  explanation: 当日高点高于20日均高时取近两日高点涨幅的负值（否则为零），体现价格处于相对高位时对短期超涨的逆向押注与回落（均值回归）预期。
 - name: alpha024
   expression: IF(LE(((TS_MEAN(CLOSE, 100) - DELAY(TS_MEAN(CLOSE, 100), 100)) / DELAY(CLOSE,
     100)), 0.05), ((CLOSE - TS_MIN(CLOSE, 100)) * -1), ((CLOSE - DELAY(CLOSE, 3))
     * -1))
-  explanation: null
+  explanation: 该因子以100日均线近百日增幅作为趋势阈值，在长期趋势较弱（≤5%）时度量价格距百日低点的贴近度、在趋势较强时采用近3日收益的反向信号，体现弱势偏好低位与强势期短期反转的思想。
 - name: alpha025
   expression: RANK(((((((CLOSE / DELAY(CLOSE, 1)) - 1) * -1) * TS_MEAN(VOLUME, 20))
     * (AMOUNT / (VOLUME + 1e-07))) * (HIGH - CLOSE)))
-  explanation: null
+  explanation: 该因子将当日负收益与“收盘低于盘中高点”的幅度相结合，并以20日均量和成交均价加权，用来度量高流动性股票中的短期卖压与情绪走弱强度。
 - name: alpha026
   expression: (TS_MAX(REPLACE_NAN_INF(CORREL(TS_RANK(VOLUME, 5), TS_RANK(HIGH, 5),
     5), 0), 3) * -1)
-  explanation: null
+  explanation: 该因子取近3日内“成交量与最高价的5日序列秩相关”的最大值并取负，用以刻画近期量价共振（冲高放量）的强度并对其进行反向暴露，偏好高点未显著放量的标的。
 - name: alpha027
   expression: IF(GT(RANK((TS_MEAN(CORREL(RANK(VOLUME), RANK((AMOUNT / (VOLUME + 1e-07))),
     6), 2) / 2)), 0.5), -1, 1)
-  explanation: null
+  explanation: 该因子以近6日内成交量与成交均价（成交额/成交量）在横截面排名的相关性（经短期平滑）衡量价格-流动性共振：相关性高表明高位放量的情绪/拥挤交易因而反向做空，相关性低或为负则做多以博取短期回撤。
 - name: alpha028
   expression: SCALE(((REPLACE_NAN_INF(CORREL(TS_MEAN(VOLUME, 20), LOW, 5), 0) + ((HIGH
     + LOW) / 2)) - CLOSE))
-  explanation: null
+  explanation: 该因子通过近5日“20日均量与最低价”的相关性并结合收盘价相对当日高低中点的位置，综合刻画成交活跃与价格位置的联动，从而反映短期供需强弱与价格压力。
 - name: alpha029
   expression: (TS_MIN(RANK(RANK(SCALE(LOG(TS_SUM(RANK(RANK((RANK(((CLOSE - 1) - DELAY((CLOSE
     - 1), 5))) * -1))), 2))))), 5) + TS_RANK(DELAY((((CLOSE / DELAY(CLOSE, 1)) - 1)
     * -1), 6), 5))
-  explanation: null
+  explanation: 该因子通过叠加近5日价格下行的极端程度与约一周前单日跌幅的时序相对强弱，刻画短期超卖与情绪过度反应，从而捕捉可能的短期反转收益。
 - name: alpha030
   expression: ((RANK(((SIGN((CLOSE - DELAY(CLOSE, 1))) + SIGN(DELAY((CLOSE - DELAY(CLOSE,
     1)), 1))) + SIGN(DELAY((CLOSE - DELAY(CLOSE, 1)), 2)))) - 1) * REPLACE_NAN_INF((TS_SUM(VOLUME,
     5) / TS_SUM(VOLUME, 20)), 1))
-  explanation: null
+  explanation: 衡量近三日价格方向一致性（连涨/连跌）并以5日/20日成交量比强化信号，反映在相对放量背景下的短期趋势与情绪强弱，偏向对下跌放量情形更敏感、具有一定反转指向。
 - name: alpha031
   expression: ((RANK(RANK(RANK(DECAY_LINEAR((RANK(RANK((CLOSE - DELAY(CLOSE, 10))))
     * -1), 10)))) + RANK(((CLOSE - DELAY(CLOSE, 3)) * -1))) + SIGN(SCALE(REPLACE_NAN_INF(CORREL(TS_MEAN(VOLUME,
     20), LOW, 12), 0))))
-  explanation: null
+  explanation: 该因子偏好近期（3–10日）收益较差的股票，并结合20日均量与低价的相关性方向作为流动性/情绪过滤，以捕捉短期超跌后的均值回归机会。
 - name: alpha032
   expression: (SCALE(((TS_MEAN(CLOSE, 7) / 7) - CLOSE)) + (SCALE(CORREL((AMOUNT /
     (VOLUME + 1e-07)), DELAY(CLOSE, 5), 230)) * 20))
-  explanation: null
+  explanation: 该因子将“收盘价相对7日均值的短期偏离”（均值回归）与“过去230日内成交均价（AMOUNT/VOLUME）与5日前收盘价的相关性”（趋势/交易惯性与流动性结构）结合且加权偏重后者，从而刻画价格的短期背离与中长期持续性。
 - name: alpha033
   expression: RANK(((OPEN / CLOSE) - 1))
-  explanation: null
+  explanation: 衡量相对收盘价的开盘溢价并做横截面排序，以反映当日日内走势与资金情绪：排名越高代表开高走低、卖压更强，排名越低代表开低走高、买盘更强。
 - name: alpha034
   expression: RANK(((RANK(REPLACE_NAN_INF((TS_STDDEV(((CLOSE / DELAY(CLOSE, 1)) -
     1), 2) / TS_STDDEV(((CLOSE / DELAY(CLOSE, 1)) - 1), 5)), 1)) - 2) - RANK((CLOSE
     - DELAY(CLOSE, 1)))))
-  explanation: null
+  explanation: 衡量短期（2日）相对中期（5日）波动率的上升与当日收益强弱之间的背离，偏好波动突增但价格未同步走强的股票，体现潜在的均值回归信号。
 - name: alpha035
   expression: ((TS_RANK(VOLUME, 32) * (TS_RANK(((CLOSE + HIGH) - LOW), 16) - 1)) *
     (TS_RANK(((CLOSE / DELAY(CLOSE, 1)) - 1), 32) - 1))
-  explanation: null
+  explanation: 该因子倾向在成交量相对放大、短期收益与价格/振幅排名偏低时取高值，体现以放量确认的短期超卖—均值回归（反弹）预期。
 - name: alpha036
   expression: (((((RANK(CORREL((CLOSE - OPEN), DELAY(VOLUME, 1), 15)) * 2.21) + (RANK((OPEN
     - CLOSE)) * 0.7)) + (RANK(TS_RANK(DELAY((((CLOSE / DELAY(CLOSE, 1)) - 1) * -1),
     6), 5)) * 0.73)) + RANK(ABS(CORREL((AMOUNT / (VOLUME + 1e-07)), TS_MEAN(VOLUME,
     20), 6)))) + (RANK((((TS_MEAN(CLOSE, 200) / 200) - OPEN) * (CLOSE - OPEN))) *
     0.6))
-  explanation: null
+  explanation: 该因子通过综合前一日成交量与当日日内涨跌的相关性、近期（约6–10日）负收益的极端性与反转倾向、价格（均价）与均量状态的联动强度，以及开盘价相对长期均值偏离与当日内动量的交互效应，旨在捕捉由流动性压力与情绪驱动的短期价格反转机会。
 - name: alpha037
   expression: (RANK(CORREL(DELAY((OPEN - CLOSE), 1), CLOSE, 200)) + RANK((OPEN - CLOSE)))
-  explanation: null
+  explanation: 该因子以长期窗口中“前一日开收差”与后续收盘价的相关性度量盘中资金压力对价格的传导，并叠加当日开收差，反映由流动性与情绪驱动的短期动能或反转强度。
 - name: alpha038
   expression: ((RANK(TS_RANK(OPEN, 10)) * -1) * RANK(REPLACE_NAN_INF((CLOSE / OPEN),
     1)))
-  explanation: null
+  explanation: 该因子将开盘价相对近10日位置的逆排名与当日收/开涨幅的排名相乘，偏好开盘处于近期低位且当日走强的股票，体现“低开转强”的日内动量与均值回归效应。
 - name: alpha039
   expression: ((RANK(((CLOSE - DELAY(CLOSE, 7)) * (RANK(DECAY_LINEAR((VOLUME / TS_MEAN(VOLUME,
     20)), 9)) - 1))) * -1) * (RANK(TS_MEAN(((CLOSE / DELAY(CLOSE, 1)) - 1), 250))
     + 1))
-  explanation: null
+  explanation: 该因子在长期动量更强的股票上放大权重，倾向做多近一周在相对低成交量（对近期更敏感）下上涨的个股、做空低量下下跌者，押注低参与度与供给约束驱动的趋势延续。
 - name: alpha040
   expression: ((RANK(TS_STDDEV(HIGH, 10)) * -1) * REPLACE_NAN_INF(CORREL(HIGH, VOLUME,
     10), 1))
-  explanation: null
+  explanation: 该因子以10日最高价波动率的截面反向排序体现“低风险”偏好，并以10日最高价与成交量的相关性加权，从而偏好在成交量配合下稳健上行（价量共振）的股票、回避高波动与价量背离的标的。
 - name: alpha041
   expression: (((HIGH * LOW) ** 0.5) - (AMOUNT / (VOLUME + 1e-07)))
-  explanation: null
+  explanation: 该因子以高低价的几何均值减去成交均价（成交额/成交量），衡量成交相对价位与买卖压力：值越负表示成交更偏区间高位（买压更强），值越正表示更偏低位（卖压更强）。
 - name: alpha042
   expression: (RANK(((AMOUNT / (VOLUME + 1e-07)) - CLOSE)) / RANK(((AMOUNT / (VOLUME
     + 1e-07)) + CLOSE)))
-  explanation: null
+  explanation: 该因子以成交均价（AMOUNT/VOLUME）与收盘价的偏离并经横截面排序归一为核心，度量收盘相对均价的溢折价以反映尾盘资金压力与短期价格动能/反转信号。
 - name: alpha043
   expression: (TS_RANK(REPLACE_NAN_INF((VOLUME / TS_MEAN(VOLUME, 20)), 0), 20) * TS_RANK(((CLOSE
     - DELAY(CLOSE, 7)) * -1), 8))
-  explanation: null
+  explanation: 该因子衡量相对近20日均量的放量与近7日价格下跌（取反动量）的共振强度，偏好放量下跌个股以博取抛压与关注度提升后可能出现的短期反弹。
 - name: alpha044
   expression: (REPLACE_NAN_INF(CORREL(HIGH, RANK(VOLUME), 5), 0) * -1)
-  explanation: null
+  explanation: 该因子为近5日最高价与成交量排名的相关系数取负，用以刻画量价背离：值越大表示“冲高伴随低量”，上行动能不足；值越小表示量价共振，趋势更易延续。
 - name: alpha045
   expression: (((RANK(TS_MEAN(DELAY(CLOSE, 5), 20)) * REPLACE_NAN_INF(CORREL(CLOSE,
     VOLUME, 2), 0)) * RANK(REPLACE_NAN_INF(CORREL(TS_SUM(CLOSE, 5), TS_SUM(CLOSE,
     20), 2), 1))) * -1)
-  explanation: null
+  explanation: 该因子以滞后5日的20日均价的横截面排序、近2日价量相关性与短中期（5/20日）价格趋势一致性的乘积后取负，体现对量价共振型动量的反向敞口，偏好此前价格相对较低且近期价量或趋势不一致的均值回归机会。
 - name: alpha046
   expression: IF(GT((((DELAY(CLOSE, 20) - DELAY(CLOSE, 10)) / 10) - ((DELAY(CLOSE,
     10) - CLOSE) / 10)), 0.25), -1, IF(LT((((DELAY(CLOSE, 20) - DELAY(CLOSE, 10))
     / 10) - ((DELAY(CLOSE, 10) - CLOSE) / 10)), 0), 1, ((CLOSE - DELAY(CLOSE, 1))
     * -1)))
-  explanation: null
+  explanation: 该因子比较近10日与前10日的平均涨跌幅差（动量加速度）并结合隔日反转：动量强烈加速时给出做空、动量减弱时做多，旨在捕捉短期价格过度反应的均值回归收益。
 - name: alpha047
   expression: REPLACE_NAN_INF(((((RANK((CLOSE / 1)) * VOLUME) / TS_MEAN(VOLUME, 20))
     * ((HIGH * RANK((HIGH - CLOSE))) / (TS_MEAN(HIGH, 5) / 5))) - RANK(((AMOUNT /
     (VOLUME + 1e-07)) - DELAY((AMOUNT / (VOLUME + 1e-07)), 5)))), 0)
-  explanation: null
+  explanation: 该因子综合放量（相对20日均量）与当日收盘弱于盘中高点的程度（并按近期高位水平校准），再扣除近5日VWAP上行动量，刻画短期资金拥挤与价格偏离所带来的均值回归预期。
 - name: alpha049
   expression: IF(LT((((DELAY(CLOSE, 20) - DELAY(CLOSE, 10)) / 10) - ((DELAY(CLOSE,
     10) - CLOSE) / 10)), -0.1), 1, ((CLOSE - DELAY(CLOSE, 1)) * -1))
-  explanation: null
+  explanation: 该因子衡量价格趋势的加速度：若最近10日相较前一10日显著转弱则以固定高值标记趋势恶化，否则以当日负收益刻画短期下跌压力。
 - name: alpha050
   expression: (TS_MAX(RANK(REPLACE_NAN_INF(CORREL(RANK(VOLUME), RANK((AMOUNT / (VOLUME
     + 1e-07))), 5), 0)), 5) * -1)
-  explanation: null
+  explanation: 该因子以近5日“成交量与平均成交价（金额/量）的相关性”在横截面的最大排名取反来衡量短期价量共振强弱，偏好近期价量相关性较弱或负相关的标的、回避情绪驱动的放量上涨。
 - name: alpha051
   expression: IF(LT((((DELAY(CLOSE, 20) - DELAY(CLOSE, 10)) / 10) - ((DELAY(CLOSE,
     10) - CLOSE) / 10)), -0.05), 1, ((CLOSE - DELAY(CLOSE, 1)) * -1))
-  explanation: null
+  explanation: 该因子以相邻两个10日段的平均价格斜率之和判断是否出现显著下行：若显著下跌则统一做多博反弹，否则执行一天期反转（做空昨日涨、做多昨日跌），本质押注价格的均值回归。
 - name: alpha052
   expression: ((((TS_MIN(LOW, 5) - DELAY(TS_MIN(LOW, 5), 5)) * -1) * RANK(((TS_SUM(((CLOSE
     / DELAY(CLOSE, 1)) - 1), 240) - TS_SUM(((CLOSE / DELAY(CLOSE, 1)) - 1), 20)) /
     220))) * TS_RANK(VOLUME, 5))
-  explanation: null
+  explanation: 该因子度量在近期成交量放大时个股是否创出更低低点（短期下行/支撑下破）的强度，并以过去一年（剔除近月）的长期收益强弱作权重，从而偏向筛出曾经强势但当前走弱的股票。
 - name: alpha053
   expression: (((((CLOSE - LOW) - (HIGH - CLOSE)) / IF(EQ((CLOSE - LOW), 0), 0.0001,
     (CLOSE - LOW))) - DELAY((((CLOSE - LOW) - (HIGH - CLOSE)) / IF(EQ((CLOSE - LOW),
     0), 0.0001, (CLOSE - LOW))), 9)) * -1)
-  explanation: null
+  explanation: 刻画收盘价在当日高低区间中的相对位置相较9日前的变化（取负），以反映短期买卖力量与价格动能的切换。
 - name: alpha054
   expression: ((((LOW - CLOSE) * -1) * (OPEN ** 5)) / (IF(EQ((LOW - HIGH), 0), 0.0001,
     (LOW - HIGH)) * (CLOSE ** 5)))
-  explanation: null
+  explanation: 刻画收盘价在当日高低区间的相对位置，并以开收比的五次方强化开盘相对收盘的影响，从而反映日内多空强弱与开盘到收盘的偏离程度。
 - name: alpha055
   expression: (REPLACE_NAN_INF(CORREL(RANK(((CLOSE - TS_MIN(LOW, 12)) / IF(EQ((TS_MAX(HIGH,
     12) - TS_MIN(LOW, 12)), 0), 0.0001, (TS_MAX(HIGH, 12) - TS_MIN(LOW, 12))))), RANK(VOLUME),
     6), 0) * -1)
-  explanation: null
+  explanation: 该因子以近6日内“价格在12日区间中的相对位置”（类似随机指标）与成交量的秩相关为基础并取相反号，用于刻画短期价量背离程度，数值越大代表价格走强而量能不配合或价格走弱而放量的负相关更显著。
 - name: alpha057
   expression: ((((CLOSE - (AMOUNT / (VOLUME + 1e-07))) / DECAY_LINEAR(RANK(TS_ARGMAX(CLOSE,
     30)), 2)) * 1) - 0)
-  explanation: null
+  explanation: 该因子衡量收盘价相对成交均价（VWAP）的溢折价，并按近30日创新高的最近程度进行放大（越近权重越高），以刻画收盘资金压力与动量强弱。
 - name: alpha060
   expression: (((SCALE(RANK(((((CLOSE - LOW) - (HIGH - CLOSE)) * VOLUME) / IF(EQ((HIGH
     - LOW), 0), 0.0001, (HIGH - LOW))))) * 2) - SCALE(RANK(TS_ARGMAX(CLOSE, 10))))
     - 0)
-  explanation: null
+  explanation: 该因子以收盘在日内区间的位置并由成交量放大、对波动幅度归一来度量即时买盘压力，同时惩罚10日高点不够新鲜的标的，从而刻画经量价确认的短期动量强度。
 - name: alpha061
   expression: IF(LT(RANK(((AMOUNT / (VOLUME + 1e-07)) - TS_MIN((AMOUNT / (VOLUME +
     1e-07)), 16))), RANK(CORREL((AMOUNT / (VOLUME + 1e-07)), TS_MEAN(VOLUME, 180),
     18))), 1, 0)
-  explanation: null
+  explanation: 该因子在个股当前均价接近近16日低位且其价格与180日成交量均值在近18日相关性较高时取1，反映流动性改善下的超卖反弹预期。
 - name: alpha062
   expression: (IF(LT(RANK(CORREL((AMOUNT / (VOLUME + 1e-07)), TS_MEAN(TS_MEAN(VOLUME,
     20), 22), 10)), RANK(IF(LT((RANK(OPEN) + RANK(OPEN)), (RANK(((HIGH + LOW) / 2))
     + RANK(HIGH))), 1, 0))), 1, 0) * -1)
-  explanation: null
+  explanation: 该因子刻画“价强量弱”的无量上行：当近10日价格与长期均量趋势相关性偏弱却盘中相对开盘走强时触发做空信号。
 - name: alpha064
   expression: (IF(LT(RANK(CORREL(TS_MEAN(((OPEN * 0.178404) + (LOW * 0.821596)), 13),
     TS_MEAN(TS_MEAN(VOLUME, 120), 13), 17)), RANK((((((HIGH + LOW) / 2) * 0.178404)
     + ((AMOUNT / (VOLUME + 1e-07)) * 0.821596)) - DELAY(((((HIGH + LOW) / 2) * 0.178404)
     + ((AMOUNT / (VOLUME + 1e-07)) * 0.821596)), 4)))), 1, 0) * -1)
-  explanation: null
+  explanation: 该因子比较短期价格动量（基于VWAP/中价的4日变化）与价格对长期成交量趋势的相关性排名，当动量强而量价联动弱时识别为“量不配价”的上涨并给出做空信号。
 - name: alpha065
   expression: (IF(LT(RANK(CORREL(((OPEN * 0.00817205) + ((AMOUNT / (VOLUME + 1e-07))
     * 0.99182795)), TS_MEAN(TS_MEAN(VOLUME, 60), 9), 6)), RANK((OPEN - TS_MIN(OPEN,
     14)))), 1, 0) * -1)
-  explanation: null
+  explanation: 捕捉量价背离：当价格（近似成交均价）已明显脱离近14日低点而与平滑成交量在短期相关性偏弱时触发负向/做空信号。
 - name: alpha066
   expression: ((RANK(DECAY_LINEAR(((AMOUNT / (VOLUME + 1e-07)) - DELAY((AMOUNT / (VOLUME
     + 1e-07)), 4)), 7)) + TS_RANK(DECAY_LINEAR(REPLACE_NAN_INF(((((LOW * 0.96633)
     + (LOW * 0.03367)) - (AMOUNT / (VOLUME + 1e-07))) / (OPEN - ((HIGH + LOW) / 2))),
     0), 11), 7)) * -1)
-  explanation: null
+  explanation: 该因子将近一周衰减加权的VWAP相对4日变动与VWAP在当日区间中的位置（按开盘相对日内中位价偏离归一）进行时序与截面强弱度量后合成并取反，意在捕捉短期动量的均值回归与盘中资金压力（做空短期强势、做多相对被压价）。
 - name: alpha068
   expression: (IF(LT(TS_RANK(CORREL(RANK(HIGH), RANK(TS_MEAN(VOLUME, 15)), 9), 14),
     RANK((((CLOSE * 0.518371) + (LOW * 0.481629)) - DELAY(((CLOSE * 0.518371) + (LOW
     * 0.481629)), 1)))), 1, 0) * -1)
-  explanation: null
+  explanation: 当股票短期涨幅靠前但高点与均量的相关性在自身历史上偏低时，表明价升量弱、上涨缺乏确认，给出做空信号。
 - name: alpha071
   expression: MAX(TS_RANK(DECAY_LINEAR(CORREL(TS_RANK(CLOSE, 3), TS_RANK(TS_MEAN(VOLUME,
     180), 12), 18), 4), 16), TS_RANK(DECAY_LINEAR((RANK(((LOW + OPEN) - ((AMOUNT /
     (VOLUME + 1e-07)) + (AMOUNT / (VOLUME + 1e-07))))) ** 2), 16), 4))
-  explanation: null
+  explanation: 衡量个股近期价格动能是否获得长期成交量趋势的配合以及开盘/最低价相对成交均价的异常偏离，并通过取两者的最大值突出近期具备放量趋势动能或存在显著流动性冲击的股票。
 - name: alpha072
   expression: ((RANK(DECAY_LINEAR(CORREL(((HIGH + LOW) / 2), TS_MEAN(VOLUME, 40),
     9), 10)) + 0.0001) / (RANK(DECAY_LINEAR(CORREL(TS_RANK((AMOUNT / (VOLUME + 1e-07)),
     4), TS_RANK(VOLUME, 19), 7), 3)) + 0.0001))
-  explanation: null
+  explanation: 该因子衡量“价格与中期成交量均值的一致性”相对于“短期价量共振热度”的强弱比，高值通常指示价格更多由持续性资金与流动性支撑而非短期噪声与交易拥挤驱动。
 - name: alpha073
   expression: (MAX(RANK(DECAY_LINEAR(((AMOUNT / (VOLUME + 1e-07)) - DELAY((AMOUNT
     / (VOLUME + 1e-07)), 5)), 3)), TS_RANK(DECAY_LINEAR((((((OPEN * 0.147155) + (LOW
     * 0.852845)) - DELAY(((OPEN * 0.147155) + (LOW * 0.852845)), 2)) / ((OPEN * 0.147155)
     + (LOW * 0.852845))) * -1), 3), 17)) * -1)
-  explanation: null
+  explanation: 通过对近5日成交均价的上行动量与近2日贴近低位价格的下跌强度进行平滑排序取最大值后再取反，该因子识别短期过热或超跌状态，以博取价格的短期均值回归。
 - name: alpha074
   expression: (IF(LT(RANK(CORREL(CLOSE, TS_MEAN(TS_MEAN(VOLUME, 30), 37), 15)), RANK(CORREL(RANK(((HIGH
     * 0.0261661) + ((AMOUNT / (VOLUME + 1e-07)) * 0.9738339))), RANK(VOLUME), 11))),
     1, 0) * -1)
-  explanation: null
+  explanation: 该因子衡量短期量价相关性相对长期平滑量价相关的抬升程度，当短期量价共振显著强于长期趋势时输出负值，反映资金推动下的交易拥挤与过热并指示潜在回撤的均值回归风险。
 - name: alpha075
   expression: IF(LT(RANK(CORREL((AMOUNT / (VOLUME + 1e-07)), VOLUME, 4)), RANK(CORREL(RANK(LOW),
     RANK(TS_MEAN(VOLUME, 50)), 12))), 1, 0)
-  explanation: null
+  explanation: 当低点价格与50日均量的相关性（近12期）在横截面上高于短期均价与成交量的相关性（近4期）时记为1，用以刻画由稳定流动性支撑的低位承接与抗跌特征。
 - name: alpha077
   expression: MIN(RANK(DECAY_LINEAR(((((HIGH + LOW) / 2) + HIGH) - ((AMOUNT / (VOLUME
     + 1e-07)) + HIGH)), 20)), RANK(DECAY_LINEAR(REPLACE_NAN_INF(CORREL(((HIGH + LOW)
     / 2), TS_MEAN(VOLUME, 40), 3), 1), 6)))
-  explanation: null
+  explanation: 通过日内中位价与成交均价（AMOUNT/VOLUME）的差异衡量买卖压力，并结合近3日价格与40日均量的相关性强弱（线性衰减后取两者排名较小者），以刻画近期量价配合与供需失衡程度。
 - name: alpha078
   expression: (RANK(CORREL(TS_SUM(((LOW * 0.352233) + ((AMOUNT / (VOLUME + 1e-07))
     * 0.647767)), 20), TS_SUM(TS_MEAN(VOLUME, 40), 20), 7)) ** RANK(REPLACE_NAN_INF(CORREL(RANK((AMOUNT
     / (VOLUME + 1e-07))), RANK(VOLUME), 6), 0)))
-  explanation: null
+  explanation: 该因子度量价格（低价与成交均价加权）与中期成交量趋势在短期内的同向性，并按近期价格-成交量共振强弱进行非线性放大，反映流动性推动的量价共振与资金驱动的趋势强度。
 - name: alpha081
   expression: (IF(LT(RANK(LOG(TS_PRODUCT(RANK((RANK(CORREL((AMOUNT / (VOLUME + 1e-07)),
     TS_SUM(TS_MEAN(VOLUME, 10), 50), 8)) ** 4)), 15))), RANK(CORREL(RANK((AMOUNT /
     (VOLUME + 1e-07))), RANK(VOLUME), 5))), 1, 0) * -1)
-  explanation: null
+  explanation: 衡量价格与成交量短期相关性相对其历史持续强度的异常升温，当短期相关性显著偏强（交易热度/流动性冲击）时输出-1、否则为0，意在反向押注后续回归常态。
 - name: alpha083
   expression: ((RANK(DELAY(((HIGH - LOW) / (TS_SUM(CLOSE, 5) / 5)), 2)) * RANK(RANK(VOLUME)))
     / (((HIGH - LOW) / (TS_SUM(CLOSE, 5) / 5)) / ((AMOUNT / (VOLUME + 1e-07)) - CLOSE)))
-  explanation: null
+  explanation: 该因子将两日前的相对振幅与成交量强弱的共振进行排名并与当日收盘相对VWAP的偏离（按当日相对振幅缩放）相结合，旨在刻画高波动高成交背景下短期流动性驱动的错价与均值回归压力。
 - name: alpha084
   expression: (TS_RANK(((AMOUNT / (VOLUME + 1e-07)) - TS_MAX((AMOUNT / (VOLUME + 1e-07)),
     15)), 21) ** (CLOSE - DELAY(CLOSE, 5)))
-  explanation: null
+  explanation: 衡量当日平均成交价相对15日高点的偏离度并以近5日价格变动为指数进行非线性放大，从而在上涨时强调逼近高位的动能、在下跌时突出远离高位的超卖压力。
 - name: alpha085
   expression: (RANK(REPLACE_NAN_INF(CORREL(((HIGH * 0.876703) + (CLOSE * 0.123297)),
     TS_MEAN(VOLUME, 30), 10), 1)) ** RANK(REPLACE_NAN_INF(CORREL(TS_RANK(((HIGH +
     LOW) / 2), 4), TS_RANK(VOLUME, 10), 7), 1)))
-  explanation: null
+  explanation: 该因子以“偏高价与30日均量的10日相关性”的横截面秩为底、以“中间价与成交量秩序变化的7日相关性”的横截面秩为指数进行放大，强调量价同向且持续的共振以刻画资金主动买入力度与趋势延续的可能性。
 - name: alpha086
   expression: (IF(LT(TS_RANK(CORREL(CLOSE, TS_MEAN(TS_MEAN(VOLUME, 20), 15), 6), 20),
     RANK(((OPEN + CLOSE) - ((AMOUNT / (VOLUME + 1e-07)) + OPEN)))), 1, 0) * -1)
-  explanation: null
+  explanation: 当短期价格与平滑成交量的相关性处于相对低位而收盘价相对VWAP在截面上更强时，该因子给出-1，刻画量价背离下的冲高乏力与回撤风险。
 - name: alpha088
   expression: MIN(TS_RANK(DECAY_LINEAR(REPLACE_NAN_INF(CORREL(TS_RANK(CLOSE, 8), TS_RANK(TS_MEAN(VOLUME,
     60), 21), 8), 0), 7), 3), RANK(DECAY_LINEAR(((RANK(OPEN) + RANK(LOW)) - (RANK(HIGH)
     + RANK(CLOSE))), 8)))
-  explanation: null
+  explanation: 该因子以近期价格与成交量均值的相关性（量价共振）和由开高低收相对强弱刻画的短期盘中压力两项信号取较小值，刻画价格趋势是否得到量能确认且未被盘中走弱所削弱。
 - name: alpha092
   expression: MIN(TS_RANK(DECAY_LINEAR(REPLACE_NAN_INF(CORREL(RANK(LOW), RANK(TS_MEAN(VOLUME,
     30)), 8), 0), 7), 7), TS_RANK(DECAY_LINEAR(IF(LT((((HIGH + LOW) / 2) + CLOSE),
     (LOW + OPEN)), 1, 0), 15), 19))
-  explanation: null
+  explanation: 该因子以“低价位与30日均量的短期联动性”走弱和“收盘相对开盘与区间偏低”的日内疲弱为核心并取两者中更弱者，刻画价格—流动性背离下的资金撤退与短期下行压力。
 - name: alpha094
   expression: ((RANK(((AMOUNT / (VOLUME + 1e-07)) - TS_MIN((AMOUNT / (VOLUME + 1e-07)),
     12))) ** TS_RANK(REPLACE_NAN_INF(CORREL(TS_RANK((AMOUNT / (VOLUME + 1e-07)), 20),
     TS_RANK(TS_MEAN(VOLUME, 60), 4), 18), 0), 3)) * -1)
-  explanation: null
+  explanation: 该因子以成交额/成交量近似均价度量个股相对12日低点的反弹幅度，并按近期价量相关性强弱加权后取反，押注放量上行后的短期回撤与均值回归。
 - name: alpha095
   expression: IF(LT(RANK((OPEN - TS_MIN(OPEN, 12))), TS_RANK((RANK(CORREL(TS_MEAN(((HIGH
     + LOW) / 2), 19), TS_MEAN(TS_MEAN(VOLUME, 40), 19), 13)) ** 5), 12)), 1, 0)
-  explanation: null
+  explanation: 该因子刻画当开盘价接近近12日低点且近期平滑价格与平滑成交量的相关性显著上升的情形，反映量价共振与流动性/情绪对短期价格状态的驱动。
 - name: alpha096
   expression: (MAX(TS_RANK(DECAY_LINEAR(REPLACE_NAN_INF(CORREL(RANK((AMOUNT / (VOLUME
     + 1e-07))), RANK(VOLUME), 4), 0), 4), 8), TS_RANK(DECAY_LINEAR(TS_ARGMAX(REPLACE_NAN_INF(CORREL(TS_RANK(CLOSE,
     7), TS_RANK(TS_MEAN(VOLUME, 60), 4), 4), 0), 13), 14), 13)) * -1)
-  explanation: null
+  explanation: 该因子通过度量近期价格（VWAP/收盘的区间位置）与成交量（当日量及60日均量）之间的短期共振强度及其最近峰值，并取两路信号的最大值后取负，本质上刻画“价量共振/资金追涨”的拥挤度并构造成对该拥挤度的反转押注。
 - name: alpha098
   expression: (RANK(DECAY_LINEAR(CORREL((AMOUNT / (VOLUME + 1e-07)), TS_MEAN(TS_MEAN(VOLUME,
     5), 26), 5), 7)) - RANK(DECAY_LINEAR(TS_RANK(TS_ARGMIN(REPLACE_NAN_INF(CORREL(RANK(OPEN),
     RANK(TS_MEAN(VOLUME, 15)), 21), 0), 9), 7), 8)))
-  explanation: null
+  explanation: 该因子衡量均价（成交额/成交量）与中期量能趋势的近期共振强度，并惩罚近期开盘价与量能相关性显著走弱的标的，从而偏好量价配合、由成交量支撑的稳健价格趋势。
 - name: alpha099
   expression: (IF(LT(RANK(CORREL(TS_SUM(((HIGH + LOW) / 2), 20), TS_SUM(TS_MEAN(VOLUME,
     60), 20), 9)), RANK(CORREL(LOW, VOLUME, 6))), 1, 0) * -1)
-  explanation: null
+  explanation: 该因子通过比较短期低点与成交量的相关性是否高于长期平滑价量相关性来识别放量下压的供需失衡，若短期相关性更强则输出-1，指示下行风险。
 - name: alpha101
   expression: ((CLOSE - OPEN) / ((HIGH - LOW) + 0.001))
-  explanation: null
-- name: alpha101
-  expression: ((CLOSE - OPEN) / ((HIGH - LOW) + 0.001))
-  explanation: 该因子衡量的是股票在一个交易日内价格波动的方向和幅度相对于其总波动范围的比例，反映了市场情绪和价格动量。
-- name: LLM_Factor1111111
-  expression: DECAY_LINEAR(TS_SUM((HIGH - LOW) / CLOSE, 10), 5)
-  explanation: 该因子衡量价格波动幅度相对于收盘价的变化，反映市场波动性。
-- name: LLM_Factor2222222
-  expression: DECAY_LINEAR(CORREL(OPEN, CLOSE, 10), 5)
-  explanation: 该因子捕捉的是开盘价与收盘价之间的短期相关性变化。
-- name: LLM_Factor3333333
-  expression: SCALE((REPLACE_NAN_INF(CORREL((VWAP - OPEN), RET, 12), 0) * -1))
-  explanation: 该因子度量开盘至VWAP的日内溢价与收益的相关性并取反以捕捉过度交易回落
-- name: LLM_Factor4444444
-  expression: (RANK(((AMOUNT / (VOLUME + 1e-07)) - OPEN)) * (TS_RANK((HIGH - LOW),
-    10) - 1))
-  explanation: 衡量开盘相对交易均价的偏离在窄幅行情中的修复动能。
-- name: LLM_Factor5555555
-  expression: IF(LT(TS_STDDEV(RET, 20), TS_STDDEV(RET, 60)), RANK((OPEN - TS_MEAN((AMOUNT
-    / (VOLUME + 1e-07)), 10))), RANK((TS_MEAN((AMOUNT / (VOLUME + 1e-07)), 10) - OPEN)))
-  explanation: 在低波动状态下利用开盘价相对换手价格均值的偏离捕捉回归，高波动时反向处理。
-- name: LLM_Factor6666666
-  expression: (RANK(CORREL(RET, (CLOSE - VWAP), 10)) * -1)
-  explanation: 衡量收益与盘中偏离VWAP的相关性强弱，捕捉因资金交易导致的均值回归压力。
-- name: LLM_Factor7777777
-  expression: RANK(CLOSE - DELAY(CLOSE, 5)) - RANK(CLOSE - DELAY(CLOSE, 20))
-  explanation: 利用短期动量减去长期动量，构建期限结构的差分因子，识别短期加速上涨或超卖信号。
-- name: LLM_Factor8888888
-  expression: (TS_MIN(LOW, 10) - TS_MIN(LOW, 30)) / (TS_MEAN(CLOSE, 30) + 1e-07)
-  explanation: 衡量短期支撑位相对于长期支撑位的抬升幅度，反映底部结构的稳固程度。
-- name: LLM_Factor9999999
-  expression: RANK(((CLOSE - TS_MEAN(VWAP, 10)) / (TS_STDDEV(CLOSE, 20) + 1e-07)))
-  explanation: 用相对波动标准化后的价格对VWAP偏离度评估超涨超跌。
+  explanation: 该因子衡量收盘相对开盘的净变动在当日高低价区间中的占比，反映日内多空力量对比与价格动能强弱，数值越高越接近上沿、越低越接近下沿。
+- name: alpha158_kmid
+  expression: ((CLOSE - OPEN) / OPEN)
+  explanation: 衡量当日开盘至收盘的相对收益，反映日内资金流向与多空力量对比。
+- name: alpha158_klen
+  expression: ((HIGH - LOW) / OPEN)
+  explanation: 该因子以开盘价为基准衡量当日高低价区间的相对幅度，反映日内波动性与市场不确定性。
+- name: alpha158_kmid2
+  expression: ((CLOSE - OPEN) / ((HIGH - LOW) + 1e-12))
+  explanation: 衡量当日开收盘净变动相对于最高—最低价区间的占比，反映多空力量与趋势推进效率，绝对值越大表示在给定波动下方向性更强（正为多头、负为空头）。
+- name: alpha158_kup
+  expression: ((HIGH - MAX(OPEN, CLOSE)) / OPEN)
+  explanation: 该因子度量当日高点超出开/收盘较高价的幅度相对于开盘价的比例，反映盘中短暂买盘推动的冲高未能延续（上影线）和随后的回吐压力。
+- name: alpha158_kup2
+  expression: ((HIGH - MAX(OPEN, CLOSE)) / ((HIGH - LOW) + 1e-12))
+  explanation: 衡量上影线占当日振幅的比例，数值越大表示开/收盘离最高价更远、上攻受阻抛压更强，短期偏空。
+- name: alpha158_klow
+  expression: ((MIN(OPEN, CLOSE) - LOW) / OPEN)
+  explanation: 该因子等于K线下影线长度相对开盘价的比例，用于刻画盘中探底回升与买盘承接力度，数值越大说明下方支撑更强。
+- name: alpha158_klow2
+  expression: ((MIN(OPEN, CLOSE) - LOW) / ((HIGH - LOW) + 1e-12))
+  explanation: 该因子度量当日下影线占全日振幅的比例，用以刻画盘中对下跌的拒绝与买盘承接强度，值越大表示低位存在更强支撑与抄底力量。
+- name: alpha158_ksft
+  expression: ((((CLOSE * 2) - HIGH) - LOW) / OPEN)
+  explanation: 该因子反映收盘价相对当日高低价中点的偏离方向与强度（以开盘价缩放），值越大表示收盘偏向区间上沿、买盘更强，值越小则卖压更重。
+- name: alpha158_ksft2
+  expression: ((((CLOSE * 2) - HIGH) - LOW) / ((HIGH - LOW) + 1e-12))
+  explanation: 衡量收盘价相对当日高低区间的偏离度，数值越高表示收盘靠近高位、买盘占优与上行动能强，越低则靠近低位、卖压占优与下行动能强。
+- name: alpha158_open0
+  expression: (OPEN / CLOSE)
+  explanation: 衡量当日开盘价相对收盘价的强弱，反映隔夜信息与流动性冲击在日内被买卖压力消化的方向与程度。
+- name: alpha158_high0
+  expression: (HIGH / CLOSE)
+  explanation: 衡量当日最高价相对收盘价的溢价，刻画上影线与盘中冲高回落程度，反映收盘卖压及短期情绪波动。
+- name: alpha158_low0
+  expression: (LOW / CLOSE)
+  explanation: 衡量当日最低价相对收盘价的折价程度，体现盘中下行冲击、流动性与尾盘买盘回补强弱（值越低表示日内下探更深、下行尾部风险更高且收盘回补更明显）。
+- name: alpha158_vwap0
+  expression: ((AMOUNT / (VOLUME + 1e-06)) / CLOSE)
+  explanation: 该因子近似等于VWAP/收盘价，衡量收盘价相对当日成交重心的溢（折）价程度，从而反映尾盘资金供需与价格压力。
+- name: alpha158_roc5
+  expression: (DELAY(CLOSE, 5) / CLOSE)
+  explanation: 衡量近5日相对当前的价格变动强度，值越大表示近期下跌（短期动量弱、可能均值回归），值越小表示近期上涨（短期动量强）。
+- name: alpha158_roc10
+  expression: (DELAY(CLOSE, 10) / CLOSE)
+  explanation: 衡量10日前收盘价相对当前价格的比值，等价于近10日累计收益的单调变换，从而反映短期动量/均值回归压力与市场情绪变化。
+- name: alpha158_roc20
+  expression: (DELAY(CLOSE, 20) / CLOSE)
+  explanation: 反映过去20日价格动量的强弱，值越大说明近20日价格下跌更多（动量弱、潜在反转），值越小说明上涨更多（动量强）。
+- name: alpha158_roc30
+  expression: (DELAY(CLOSE, 30) / CLOSE)
+  explanation: 该因子以30日前收盘价与当前价之比刻画近一月价格动量（即过去30日收益的反向度量），数值越大表示近期回撤更深、越小表示上涨更强，反映短期动量/反转效应与投资者情绪变化。
+- name: alpha158_roc60
+  expression: (DELAY(CLOSE, 60) / CLOSE)
+  explanation: 该因子以60日前收盘价与当前价之比衡量近60日价格动量，实质为60日累计收益的倒数：数值越小表示近期涨幅更大（强势），越大表示近期跌幅更大（弱势）。
+- name: alpha158_ma5
+  expression: (TS_MEAN(CLOSE, 5) / CLOSE)
+  explanation: 该因子衡量当前收盘价相对近5日均价的偏离程度，值越大表示现价低于近期均值（短期超卖、倾向均值回归），值越小表示现价高于均值（短期动量更强或回调风险加大）。
+- name: alpha158_ma10
+  expression: (TS_MEAN(CLOSE, 10) / CLOSE)
+  explanation: 该因子衡量当前收盘价相对近10日均价的偏离，反映短期超买/超卖与均值回归压力（值>1表明当前价低于均价、可能存在反弹空间；值<1则相反）。
+- name: alpha158_ma20
+  expression: (TS_MEAN(CLOSE, 20) / CLOSE)
+  explanation: 该因子衡量当前收盘价相对近20日均价的偏离程度，反映短期相对估值与均值回归/动量压力（值高示相对低估，值低示相对高估）。
+- name: alpha158_ma30
+  expression: (TS_MEAN(CLOSE, 30) / CLOSE)
+  explanation: 该因子以30日均价除以现价，衡量当前价格相对近月均值的偏离程度：值越大表示现价低于均值、具备均值回归/反弹潜力，值越小表示高于均值、存在回落风险或动量延续。
+- name: alpha158_ma60
+  expression: (TS_MEAN(CLOSE, 60) / CLOSE)
+  explanation: 该因子衡量当前价格相对近60日均价的偏离，反映短中期相对高低估与均值回归压力，值>1表示价格低于均值（相对低估/超卖），值<1表示高于均值（相对高估/超买）。
+- name: alpha158_std5
+  expression: (TS_STDDEV(CLOSE, 5) / CLOSE)
+  explanation: 衡量近5日收盘价相对当前价的波动强度（价格标准差/现价），反映短期相对波动率与风险水平，数值越大不确定性越高。
+- name: alpha158_std10
+  expression: (TS_STDDEV(CLOSE, 10) / CLOSE)
+  explanation: 衡量近10日收盘价相对于其价格水平的波动幅度（相对波动率/变异系数），数值越大表示短期不确定性与风险更高、可能需要更高的风险补偿。
+- name: alpha158_std20
+  expression: (TS_STDDEV(CLOSE, 20) / CLOSE)
+  explanation: 该因子度量近20日收盘价的相对波动率（价格标准差相对现价），数值越大表示短期价格不稳定性与不确定性更高、所需风险溢价可能上升。
+- name: alpha158_std30
+  expression: (TS_STDDEV(CLOSE, 30) / CLOSE)
+  explanation: 该因子衡量近30日收盘价相对于当前价的相对波动率，反映短期不确定性与风险水平，值越大说明波动更剧烈且所需风险溢价更高。
+- name: alpha158_std60
+  expression: (TS_STDDEV(CLOSE, 60) / CLOSE)
+  explanation: 该因子以过去60日收盘价的标准差相对于当前收盘价的比例来度量历史波动强度，数值越大表示标的近期不确定性与风险更高、可能需要更高的风险溢价。
+- name: alpha158_beta5
+  expression: (TS_LINEAR_REGRESSION_SLOPE(CLOSE, 5) / CLOSE)
+  explanation: 该因子将近5期收盘价的回归斜率按现价归一，刻画短期价格趋势的相对强度，即单位时间的预期涨跌速度。
+- name: alpha158_beta10
+  expression: (TS_LINEAR_REGRESSION_SLOPE(CLOSE, 10) / CLOSE)
+  explanation: 以近10期收盘价对时间的回归斜率按当前价标准化得到的无量纲动量指标，衡量单位价格的短期趋势强度，数值越大表示相对上行速度更快、越小（为负）则下行动能更强。
+- name: alpha158_beta20
+  expression: (TS_LINEAR_REGRESSION_SLOPE(CLOSE, 20) / CLOSE)
+  explanation: 该因子将20日收盘价线性回归斜率按现价归一，度量单位价格的近期趋势增长率，从而反映由资金与预期变化驱动的短期动量强弱（值越大上升趋势越强）。
+- name: alpha158_beta30
+  expression: (TS_LINEAR_REGRESSION_SLOPE(CLOSE, 30) / CLOSE)
+  explanation: 以30期收盘价线性回归斜率除以当前价格，衡量近月价格趋势的相对强度与方向，值越大代表上升动能更强、为负代表下行动能更强。
+- name: alpha158_beta60
+  expression: (TS_LINEAR_REGRESSION_SLOPE(CLOSE, 60) / CLOSE)
+  explanation: 该因子以过去60期收盘价的线性回归斜率除以当前价，衡量经价格归一化的中期趋势动量强弱与方向（正值上升、负值下降，绝对值越大趋势越强）。
+- name: alpha158_rsqr5
+  expression: TS_LINEAR_REGRESSION_R2(CLOSE, 5)
+  explanation: 衡量近5日收盘价被线性时间趋势解释的程度，R²越高表示价格走势更平滑、趋势性更强（噪声更小），越低则意味着以震荡与随机波动为主。
+- name: alpha158_rsqr10
+  expression: TS_LINEAR_REGRESSION_R2(CLOSE, 10)
+  explanation: 衡量近10日收盘价被线性趋势解释的程度，高值表示趋势性强、走势更平滑且噪声较低，低值则意味着震荡加剧、可预测性弱。
+- name: alpha158_rsqr20
+  expression: TS_LINEAR_REGRESSION_R2(CLOSE, 20)
+  explanation: 该因子衡量过去20个交易日收盘价对线性时间趋势的拟合度，高值意味着价格趋势明确且动量持续性强，低值则表示行情以震荡与噪声为主、缺乏方向性。
+- name: alpha158_rsqr30
+  expression: TS_LINEAR_REGRESSION_R2(CLOSE, 30)
+  explanation: 衡量过去30期收盘价对线性趋势的拟合度，从而反映价格走势的趋势性与稳定性：R^2越高表示趋势更强更持续、噪声更小，越低则说明走势更随机或以震荡为主。
+- name: alpha158_rsqr60
+  expression: TS_LINEAR_REGRESSION_R2(CLOSE, 60)
+  explanation: 衡量过去60日收盘价变动被线性趋势解释的程度，R²越高表示趋势性与动量更强、价格由信息逐步反映驱动，越低则说明波动更多源于噪声且缺乏持续性。
+- name: alpha158_resi5
+  expression: (TS_LINEAR_REGRESSION_RESI(CLOSE, 5) / CLOSE)
+  explanation: 该因子通过将近5日线性回归残差按当前收盘价标准化，衡量价格相对短期趋势的偏离程度，反映短期错定价与潜在的均值回归压力。
+- name: alpha158_resi10
+  expression: (TS_LINEAR_REGRESSION_RESI(CLOSE, 10) / CLOSE)
+  explanation: 衡量收盘价相对10日线性趋势的比例偏离，反映短期超涨/超跌与随后的均值回归压力。
+- name: alpha158_resi20
+  expression: (TS_LINEAR_REGRESSION_RESI(CLOSE, 20) / CLOSE)
+  explanation: 该因子为收盘价相对其20日线性趋势的归一化残差，衡量短期相对趋势的偏离幅度与潜在均值回归信号。
+- name: alpha158_resi30
+  expression: (TS_LINEAR_REGRESSION_RESI(CLOSE, 30) / CLOSE)
+  explanation: 度量收盘价相对其30日线性趋势的相对偏离（回归残差占价），反映短期情绪/噪声导致的超涨或超跌及可能的均值回归机会。
+- name: alpha158_resi60
+  expression: (TS_LINEAR_REGRESSION_RESI(CLOSE, 60) / CLOSE)
+  explanation: 该因子刻画价格相对其60日线性趋势的相对偏离（以价格归一），反映短期高估/低估程度及潜在的均值回归压力。
+- name: alpha158_max5
+  expression: (TS_MAX(HIGH, 5) / CLOSE)
+  explanation: 反映价格相对近5日高点的偏离度，数值越大表示收盘价离近期高位更远、短期动量较弱且存在回撤。
+- name: alpha158_max10
+  expression: (TS_MAX(HIGH, 10) / CLOSE)
+  explanation: 该因子衡量当前收盘价相对近10日最高价的贴近度，值越大表示较近期高点回撤更深（短期偏弱、可能均值回归），越接近1则表明贴近高位、动量更强。
+- name: alpha158_max20
+  expression: (TS_MAX(HIGH, 20) / CLOSE)
+  explanation: 该因子衡量当前收盘价相对近20日最高价的折价程度，数值越大表示价格远离阶段高点、回撤较深且动量偏弱，越接近1则说明逼近新高、动量更强。
+- name: alpha158_max30
+  expression: (TS_MAX(HIGH, 30) / CLOSE)
+  explanation: 衡量当前收盘价相对近30日最高价的贴水程度，值越接近1表示价格贴近阶段高点、动量更强，值越大表示偏离高点更远、具备更大潜在反弹空间。
+- name: alpha158_max60
+  expression: (TS_MAX(HIGH, 60) / CLOSE)
+  explanation: 该因子衡量当前收盘价相对近60日最高价的折价（回撤）程度，值越大表示价格离阶段高点越远、动能偏弱，接近1则说明贴近新高、趋势较强。
+- name: alpha158_min5
+  expression: (TS_MIN(LOW, 5) / CLOSE)
+  explanation: 该因子刻画当前收盘价相对近5日最低价的贴近程度，数值越大说明价格靠近阶段低点（可能超跌或临近支撑），数值越小说明价格已脱离低位（短期更强或已反弹）。
+- name: alpha158_min10
+  expression: (TS_MIN(LOW, 10) / CLOSE)
+  explanation: 衡量当前收盘价相对近10日最低价的贴近度，刻画短期下行压力与超卖程度（值越大越接近阶段低点，值越小说明已从低点明显回升）。
+- name: alpha158_min20
+  expression: (TS_MIN(LOW, 20) / CLOSE)
+  explanation: 该因子衡量当前收盘价相对近20日最低价的贴近程度，值越大表示价格更接近近期底部（情绪偏弱、潜在均值回归空间大），值越小表示价格已明显脱离低位（动能更强）。
+- name: alpha158_min30
+  expression: (TS_MIN(LOW, 30) / CLOSE)
+  explanation: 该因子衡量收盘价相对近30日最低价的相对位置，值越大表示价格贴近阶段低点（风险溢价与悲观预期更高），值越小表示价格远离低点（动能更强、风险缓解）。
+- name: alpha158_min60
+  expression: (TS_MIN(LOW, 60) / CLOSE)
+  explanation: 该因子衡量当前收盘价相对近60日最低价的相对位置：值越大表示价格越贴近阶段低点（潜在低估/超卖），值越小则表明已明显脱离低位（上行动量较强）。
+- name: alpha158_qtlu5
+  expression: (TS_QUANTILE(CLOSE, 5, 0.8) / CLOSE)
+  explanation: 该因子衡量当前收盘价相对过去5日80分位价位的相对位置，数值越大表示当前价低于近期上分位（短期偏弱、具均值回归空间），数值越小表示价位接近或高于上分位（动量较强/偏高）。
+- name: alpha158_qtlu10
+  expression: (TS_QUANTILE(CLOSE, 10, 0.8) / CLOSE)
+  explanation: 衡量当前收盘价相对近10日80%分位的高低位，数值越大说明现价相对偏低（潜在均值回归空间大），越小说明价格偏强接近高位。
+- name: alpha158_qtlu20
+  expression: (TS_QUANTILE(CLOSE, 20, 0.8) / CLOSE)
+  explanation: 该因子衡量当前价格相对过去20日80分位的相对位置，数值越大表示价格低于近期高位区间、可能具备均值回归/反弹潜力，数值越小则表明价格处于高位、动能较强或有过热风险。
+- name: alpha158_qtlu30
+  expression: (TS_QUANTILE(CLOSE, 30, 0.8) / CLOSE)
+  explanation: 该因子衡量当前收盘价相对近30期80%分位价位的相对位置，数值越大表示价格处于近期相对低位（偏价值/均值回归），越小表示处于相对高位（偏动量/过热）。
+- name: alpha158_qtlu60
+  expression: (TS_QUANTILE(CLOSE, 60, 0.8) / CLOSE)
+  explanation: 通过“近60日收盘价80分位数/当前收盘价”衡量价格相对近期高位的偏离，值大代表当前相对低位或有反弹潜力，值小代表强势接近高位或存在超买风险。
+- name: alpha158_qtld5
+  expression: (TS_QUANTILE(CLOSE, 5, 0.2) / CLOSE)
+  explanation: 该因子度量当前收盘价相对近5日20%分位价位的高低，值越大越接近近期低位并提示超跌与均值回归潜力，值越小说明价格相对偏高。
+- name: alpha158_qtld10
+  expression: (TS_QUANTILE(CLOSE, 10, 0.2) / CLOSE)
+  explanation: 衡量当前收盘价相对过去10日20%分位价的相对位置，数值越大表示价格更接近近期低位、短期超跌与均值回归（反弹）潜力更强，数值越小则说明价格离低位更远、趋势动能更强。
+- name: alpha158_qtld20
+  expression: (TS_QUANTILE(CLOSE, 20, 0.2) / CLOSE)
+  explanation: 衡量当前收盘价相对过去20日第20分位数的位置，数值越大表明价格处于近期低位（超卖、相对“便宜”），体现潜在的均值回归动力。
+- name: alpha158_qtld30
+  expression: (TS_QUANTILE(CLOSE, 30, 0.2) / CLOSE)
+  explanation: 该因子衡量当前收盘价相对过去30日价格分布低位（20%分位）的相对位置，数值越大表示价格更接近或低于近期低位、具备均值回归反弹潜力，数值越小则价格远离低位、相对偏贵并可能面临回调风险。
+- name: alpha158_qtld60
+  expression: (TS_QUANTILE(CLOSE, 60, 0.2) / CLOSE)
+  explanation: 该因子衡量当前收盘价相对过去60日20%分位价的相对位置，数值越大表示价格处于历史偏低区间、具有均值回归或反弹潜力，数值越小则说明价格偏高、动量占优。
+- name: alpha158_rank5
+  expression: (TS_RANK(CLOSE, 5) / 5)
+  explanation: 衡量当前收盘价在近5日内的相对排名并归一化，数值越高表示更接近近期高位、体现短期上行动能。
+- name: alpha158_rank10
+  expression: (TS_RANK(CLOSE, 10) / 10)
+  explanation: 该因子衡量当前收盘价在过去10日中的相对位置（归一化），值高表示价格接近阶段高位、短期动量强，值低表示接近低位、可能偏弱或具反转预期。
+- name: alpha158_rank20
+  expression: (TS_RANK(CLOSE, 20) / 20)
+  explanation: 衡量当前收盘价在近20日价格分布中的相对分位，高值表示接近阶段高点，体现短期相对强弱与动量/趋势延续效应。
+- name: alpha158_rank30
+  expression: (TS_RANK(CLOSE, 30) / 30)
+  explanation: 该因子衡量当前收盘价在过去30日内的相对排名（归一化至0-1），数值越高越接近阶段高点，体现短期价格动量与乐观情绪。
+- name: alpha158_rank60
+  expression: (TS_RANK(CLOSE, 60) / 60)
+  explanation: 该因子衡量当前收盘价在过去60日价格序列中的归一化分位，数值越高表示价格越接近近60日高位，从而反映短中期动量强度与市场情绪偏强。
+- name: alpha158_rsv5
+  expression: CLIP(((CLOSE - TS_MIN(LOW, 5)) / ((TS_MAX(HIGH, 5) - TS_MIN(LOW, 5))
+    + 1e-12)), 10)
+  explanation: 该因子衡量收盘价在过去5日高低区间内的相对位置，越靠近上沿表示短期买盘占优与上行动能较强，越靠近下沿则卖压更重与下行动能较强。
+- name: alpha158_rsv10
+  expression: CLIP(((CLOSE - TS_MIN(LOW, 10)) / ((TS_MAX(HIGH, 10) - TS_MIN(LOW, 10))
+    + 1e-12)), 10)
+  explanation: 衡量收盘价在近10日高低区间中的相对位置以反映短期供需与动量强弱（越高越接近高点、买盘更强，越低越接近低点、偏弱），并通过截尾抑制极端值影响。
+- name: alpha158_rsv20
+  expression: CLIP(((CLOSE - TS_MIN(LOW, 20)) / ((TS_MAX(HIGH, 20) - TS_MIN(LOW, 20))
+    + 1e-12)), 10)
+  explanation: 该因子衡量收盘价在过去20日高低区间中的归一化位置，反映短期供需与情绪的强弱/动量特征：值高表示价格靠近阶段高点、买盘占优，值低则靠近阶段低点、卖压较强。
+- name: alpha158_rsv30
+  expression: CLIP(((CLOSE - TS_MIN(LOW, 30)) / ((TS_MAX(HIGH, 30) - TS_MIN(LOW, 30))
+    + 1e-12)), 10)
+  explanation: 该因子衡量当前收盘价在近30日高低区间中的相对位置，体现短期动量与市场情绪强弱，值越高表示价格接近阶段高位（预期乐观、买盘占优），越低则接近低位（预期悲观、卖压占优）。
+- name: alpha158_rsv60
+  expression: CLIP(((CLOSE - TS_MIN(LOW, 60)) / ((TS_MAX(HIGH, 60) - TS_MIN(LOW, 60))
+    + 1e-12)), 10)
+  explanation: 度量收盘价在过去60日高低区间中的分位位置，数值越高代表价格接近阶段高位、趋势动能与风险偏好更强，越低则接近低位、情绪偏弱。
+- name: alpha158_imax5
+  expression: (TS_ARGMAX(HIGH, 5) / 5)
+  explanation: 该因子刻画过去5个交易日内最高价出现的相对时点（经5日归一化），用于衡量是否近期创出新高及其“新鲜度”，从而反映短期动量与情绪强弱。
+- name: alpha158_imax10
+  expression: (TS_ARGMAX(HIGH, 10) / 10)
+  explanation: 该因子度量过去10日内最高价出现的相对“距今天数”的新旧程度（归一化），数值越小表示刚创10日新高、短期动能更强，数值越大则说明高点已久、动能偏弱。
+- name: alpha158_imax20
+  expression: (TS_ARGMAX(HIGH, 20) / 20)
+  explanation: 该因子衡量过去20日最高价出现的相对时间位置，数值越小表示近期刚创短期新高、动量更强，越大则说明距新高已久、动量走弱。
+- name: alpha158_imax30
+  expression: (TS_ARGMAX(HIGH, 30) / 30)
+  explanation: 该因子表示过去30日最高价出现的相对时间位置（归一化到0-1），值越小代表近期创新高、动量更强，值越大代表高点较早、动能可能走弱。
+- name: alpha158_imax60
+  expression: (TS_ARGMAX(HIGH, 60) / 60)
+  explanation: 该因子衡量过去60日内最高价出现的“新鲜度”（归一化位置），数值越小表示更近期创出60日新高、价格动能与趋势更强，越大则说明距上次高点已久、动能走弱。
+- name: alpha158_imin5
+  expression: (TS_ARGMIN(LOW, 5) / 5)
+  explanation: 衡量过去5日内最低价出现的相对时点并归一化，数值越小表示近期刚创新低、短期卖压或超卖更强，数值越大则说明距低点已久、价格有所修复。
+- name: alpha158_imin10
+  expression: (TS_ARGMIN(LOW, 10) / 10)
+  explanation: 该因子度量过去10日最低价出现的相对时点（归一化），值越小表示近期刚创10日新低、短期抛压与超卖更强且可能反弹，值越大则低点较久远、价格更偏向趋势延续。
+- name: alpha158_imin20
+  expression: (TS_ARGMIN(LOW, 20) / 20)
+  explanation: 衡量过去20日内最低价出现的相对时点并归一化，反映价格是否近期探底及其新鲜度，从而刻画短期趋势与潜在反转信息。
+- name: alpha158_imin30
+  expression: (TS_ARGMIN(LOW, 30) / 30)
+  explanation: 该因子度量过去30日最低价出现的相对时点（越小越近期），用于刻画是否刚创阶段性新低，从而反映短期下行压力与潜在超卖/反弹信号。
+- name: alpha158_imin60
+  expression: (TS_ARGMIN(LOW, 60) / 60)
+  explanation: 度量过去60日内最低价出现的相对时间位置，数值越小表示近期刚创新低（短期更弱/潜在反弹），越大表示距离上次新低已久（动量更强/趋势更稳）。
+- name: alpha158_imxd5
+  expression: ((TS_ARGMAX(HIGH, 5) - TS_ARGMIN(LOW, 5)) / 5)
+  explanation: 衡量近5日内最高价与最低价出现的相对时序（归一化时间差），值越大表示低点更早、高点更晚即短期上行动量更强，值越小说明近期偏下行。
+- name: alpha158_imxd10
+  expression: ((TS_ARGMAX(HIGH, 10) - TS_ARGMIN(LOW, 10)) / 10)
+  explanation: 该因子通过比较过去10日内最高价与最低价出现的相对先后并归一化，刻画价格在局部周期中的位置（正值表示更接近最近低点、负值表示更接近最近高点），以反映趋势阶段与潜在反转压力。
+- name: alpha158_imxd20
+  expression: ((TS_ARGMAX(HIGH, 20) - TS_ARGMIN(LOW, 20)) / 20)
+  explanation: 该因子度量过去20日最高价与最低价出现时间的相对先后与间隔，反映价格路径的趋势性与动能强弱：正值表示先低后高、上行动能较强，负值则相反。
+- name: alpha158_imxd30
+  expression: ((TS_ARGMAX(HIGH, 30) - TS_ARGMIN(LOW, 30)) / 30)
+  explanation: 该因子刻画近30日内最高价与最低价出现的先后顺序及时间差，正值表示先见低后创新高（上行趋势），负值表示先见高后创新低（下行趋势）。
+- name: alpha158_imxd60
+  expression: ((TS_ARGMAX(HIGH, 60) - TS_ARGMIN(LOW, 60)) / 60)
+  explanation: 该因子反映近60日内高低点出现的时间顺序与间隔，数值越大说明低点更早高点更晚、趋势偏上，反之偏下。
+- name: alpha158_corr5
+  expression: REPLACE_NAN_INF(CORREL(CLOSE, LOG((VOLUME + 1)), 5), 0)
+  explanation: 衡量近5日收盘价与成交量对数的相关性，正值代表价量共振（价涨放量/价跌缩量）、负值代表背离（价跌放量/价涨缩量），异常或缺失值置零。
+- name: alpha158_corr10
+  expression: REPLACE_NAN_INF(CORREL(CLOSE, LOG((VOLUME + 1)), 10), 0)
+  explanation: 该因子衡量近10日收盘价与成交量对数的相关性，反映资金交易活跃度与价格趋势的一致性：正值表明价量共振、趋势更具信度，负值表明价量背离、趋势存疑。
+- name: alpha158_corr20
+  expression: REPLACE_NAN_INF(CORREL(CLOSE, LOG((VOLUME + 1)), 20), 0)
+  explanation: 该因子以20日收盘价与对数成交量的相关系数衡量价量共振，正值表示上涨放量、趋势更可靠，负值提示价量背离或抛压，异常值置零以增强稳健性。
+- name: alpha158_corr30
+  expression: REPLACE_NAN_INF(CORREL(CLOSE, LOG((VOLUME + 1)), 30), 0)
+  explanation: 近30日收盘价与对数成交量的相关性，衡量量价是否同向以刻画资金供需与情绪对价格趋势的支撑程度（正值量价齐升、趋势更可信，负值背离、动能偏弱）。
+- name: alpha158_corr60
+  expression: REPLACE_NAN_INF(CORREL(CLOSE, LOG((VOLUME + 1)), 60), 0)
+  explanation: 衡量过去60日收盘价与ln(成交量+1)的相关性，刻画价格与成交活跃度的同向性，从而反映资金关注度与流动性对价格的驱动强弱。
+- name: alpha158_cord5
+  expression: REPLACE_NAN_INF(CORREL((CLOSE / DELAY(CLOSE, 1)), LOG(((VOLUME / (DELAY(VOLUME,
+    1) + 1e-12)) + 1)), 5), 0)
+  explanation: 该因子衡量近5日价格收益与成交量变动的相关性，数值越高表示上涨伴随放量、资金需求与趋势动能更强，越低或为负则提示价量背离、行情可信度较弱。
+- name: alpha158_cord10
+  expression: REPLACE_NAN_INF(CORREL((CLOSE / DELAY(CLOSE, 1)), LOG(((VOLUME / (DELAY(VOLUME,
+    1) + 1e-12)) + 1)), 10), 0)
+  explanation: 衡量近10日价格日收益与成交量相对变化（对数增速）的相关性，反映价格与交易活跃度是否共振，值高示涨伴放量、跌伴缩量，值低示二者背离。
+- name: alpha158_cord20
+  expression: REPLACE_NAN_INF(CORREL((CLOSE / DELAY(CLOSE, 1)), LOG(((VOLUME / (DELAY(VOLUME,
+    1) + 1e-12)) + 1)), 20), 0)
+  explanation: 该因子衡量近20日价格收益与成交量相对增速的相关性，反映资金需求与流动性驱动的价量共振程度，数值越高表示上涨常伴随放量、越低则显示价量背离。
+- name: alpha158_cord30
+  expression: REPLACE_NAN_INF(CORREL((CLOSE / DELAY(CLOSE, 1)), LOG(((VOLUME / (DELAY(VOLUME,
+    1) + 1e-12)) + 1)), 30), 0)
+  explanation: 该因子是过去30日收益与成交量增速的相关系数，刻画价量同向性并据此反映资金参与度对价格趋势的确认强弱。
+- name: alpha158_cord60
+  expression: REPLACE_NAN_INF(CORREL((CLOSE / DELAY(CLOSE, 1)), LOG(((VOLUME / (DELAY(VOLUME,
+    1) + 1e-12)) + 1)), 60), 0)
+  explanation: 该因子衡量近60日价格收益与成交量变化的相关性，反映涨跌是否得到放量配合以刻画资金参与度与趋势强弱。
+- name: alpha158_cntp5
+  expression: TS_MEAN(IF(GT(CLOSE, DELAY(CLOSE, 1)), 1, 0), 5)
+  explanation: 该因子衡量过去5个交易日中收盘价较前一日上涨的比例，反映短期价格趋势与上行动量，数值越高说明近期上涨更为频繁、买盘占优。
+- name: alpha158_cntp10
+  expression: TS_MEAN(IF(GT(CLOSE, DELAY(CLOSE, 1)), 1, 0), 10)
+  explanation: 衡量过去10日收盘价上涨的频率，反映短期价格动能与多头情绪强弱。
+- name: alpha158_cntp20
+  expression: TS_MEAN(IF(GT(CLOSE, DELAY(CLOSE, 1)), 1, 0), 20)
+  explanation: 表示近20个交易日中收盘价较前一日上涨的比例，反映短期上行动能的持续性与市场情绪/风险偏好强弱。
+- name: alpha158_cntp30
+  expression: TS_MEAN(IF(GT(CLOSE, DELAY(CLOSE, 1)), 1, 0), 30)
+  explanation: 衡量过去30个交易日中收盘价较前一日上涨的天数占比，反映近期正收益频率与上行趋势的持续性，数值越高表明正向动量与多头情绪更强。
+- name: alpha158_cntp60
+  expression: TS_MEAN(IF(GT(CLOSE, DELAY(CLOSE, 1)), 1, 0), 60)
+  explanation: 过去60个交易日中收盘价较前一日上涨的天数占比，用于衡量近期价格上行的持续性与趋势强度，数值越高表明上升动能更强、买盘更占优。
+- name: alpha158_cntn5
+  expression: TS_MEAN(IF(LT(CLOSE, DELAY(CLOSE, 1)), 1, 0), 5)
+  explanation: 衡量近5日内收盘价下跌日占比，反映短期负向动能与偏弱情绪，高值意味着价格更常下跌、下行压力更强。
+- name: alpha158_cntn10
+  expression: TS_MEAN(IF(LT(CLOSE, DELAY(CLOSE, 1)), 1, 0), 10)
+  explanation: 度量过去10日收盘价较前一日下跌的比例，反映短期卖压与偏弱的价格动量。
+- name: alpha158_cntn20
+  expression: TS_MEAN(IF(LT(CLOSE, DELAY(CLOSE, 1)), 1, 0), 20)
+  explanation: 该因子度量近20个交易日中价格下跌日的占比，反映近期卖压与偏空情绪并呈现短期负向动量特征。
+- name: alpha158_cntn30
+  expression: TS_MEAN(IF(LT(CLOSE, DELAY(CLOSE, 1)), 1, 0), 30)
+  explanation: 刻画近30日收盘价下跌日的占比，数值越高代表下行压力与负向动量更强、市场情绪偏弱。
+- name: alpha158_cntn60
+  expression: TS_MEAN(IF(LT(CLOSE, DELAY(CLOSE, 1)), 1, 0), 60)
+  explanation: 该因子衡量过去60日内收盘价较前一日下跌的比例，数值越高表示下跌天数占比越大、短期动量偏空且市场情绪偏弱。
+- name: alpha158_cntd5
+  expression: (TS_MEAN(IF(GT(CLOSE, DELAY(CLOSE, 1)), 1, 0), 5) - TS_MEAN(IF(LT(CLOSE,
+    DELAY(CLOSE, 1)), 1, 0), 5))
+  explanation: 该因子衡量近5日上涨天数相较下跌天数的净占比，反映短期价格动量与资金偏好，正值表示买盘占优、负值表示卖压占优。
+- name: alpha158_cntd10
+  expression: (TS_MEAN(IF(GT(CLOSE, DELAY(CLOSE, 1)), 1, 0), 10) - TS_MEAN(IF(LT(CLOSE,
+    DELAY(CLOSE, 1)), 1, 0), 10))
+  explanation: 衡量近10日上涨天数相对下跌天数的净占比，反映短期价格动量与多空力量强弱。
+- name: alpha158_cntd20
+  expression: (TS_MEAN(IF(GT(CLOSE, DELAY(CLOSE, 1)), 1, 0), 20) - TS_MEAN(IF(LT(CLOSE,
+    DELAY(CLOSE, 1)), 1, 0), 20))
+  explanation: 衡量过去20日上涨天数相对下跌天数的净占比，反映短期价格动量与多空力量对比，值越大表示买方占优、上行动能更强。
+- name: alpha158_cntd30
+  expression: (TS_MEAN(IF(GT(CLOSE, DELAY(CLOSE, 1)), 1, 0), 30) - TS_MEAN(IF(LT(CLOSE,
+    DELAY(CLOSE, 1)), 1, 0), 30))
+  explanation: 该因子度量过去30日上涨日占比减去下跌日占比，反映收益符号的偏向与趋势强弱，数值越高表示买方占优、风险偏好较强。
+- name: alpha158_cntd60
+  expression: (TS_MEAN(IF(GT(CLOSE, DELAY(CLOSE, 1)), 1, 0), 60) - TS_MEAN(IF(LT(CLOSE,
+    DELAY(CLOSE, 1)), 1, 0), 60))
+  explanation: 通过比较近60日上涨与下跌日的比例差，该因子衡量价格趋势偏向与动量强弱，进而反映买卖力量对比与市场情绪。
+- name: alpha158_sump5
+  expression: (TS_SUM(MAX((CLOSE - DELAY(CLOSE, 1)), 0), 5) / (TS_SUM(ABS((CLOSE -
+    DELAY(CLOSE, 1))), 5) + 1e-12))
+  explanation: 衡量近5日上涨幅度在总涨跌幅中的占比，反映短期买盘强弱与上行动能（越高表示上涨主导）。
+- name: alpha158_sump10
+  expression: (TS_SUM(MAX((CLOSE - DELAY(CLOSE, 1)), 0), 10) / (TS_SUM(ABS((CLOSE
+    - DELAY(CLOSE, 1))), 10) + 1e-12))
+  explanation: 衡量近10日上涨幅度在总波动中的占比，刻画买方力量相对卖方的强弱与短期上行趋势强度。
+- name: alpha158_sump20
+  expression: (TS_SUM(MAX((CLOSE - DELAY(CLOSE, 1)), 0), 20) / (TS_SUM(ABS((CLOSE
+    - DELAY(CLOSE, 1))), 20) + 1e-12))
+  explanation: 该因子度量过去20日上涨幅度在总价变动中的占比，刻画买方主导与趋势强弱，数值越高表示上行动量更强。
+- name: alpha158_sump30
+  expression: (TS_SUM(MAX((CLOSE - DELAY(CLOSE, 1)), 0), 30) / (TS_SUM(ABS((CLOSE
+    - DELAY(CLOSE, 1))), 30) + 1e-12))
+  explanation: 反映近30日上涨幅度在总涨跌幅中的占比，衡量短期上行动能与买方主导性，数值越大表示上涨更占优势。
+- name: alpha158_sump60
+  expression: (TS_SUM(MAX((CLOSE - DELAY(CLOSE, 1)), 0), 60) / (TS_SUM(ABS((CLOSE
+    - DELAY(CLOSE, 1))), 60) + 1e-12))
+  explanation: 衡量近60日正向价格变动占总变动的比例，反映上涨对波动的主导程度与趋势偏多性，数值越高表明上涨占优、看涨动能更强。
+- name: alpha158_sumn5
+  expression: (TS_SUM(MAX((DELAY(CLOSE, 1) - CLOSE), 0), 5) / (TS_SUM(ABS((CLOSE -
+    DELAY(CLOSE, 1))), 5) + 1e-12))
+  explanation: 该因子表示近5个交易日下跌幅度在总波动中的占比，数值越大说明下行主导、卖压偏强。
+- name: alpha158_sumn10
+  expression: (TS_SUM(MAX((DELAY(CLOSE, 1) - CLOSE), 0), 10) / (TS_SUM(ABS((CLOSE
+    - DELAY(CLOSE, 1))), 10) + 1e-12))
+  explanation: 衡量过去10日下跌绝对幅度在总绝对波动中的占比，值越高说明近期卖压主导、负面动能与下行风险更强，值越低则上行动能占优。
+- name: alpha158_sumn20
+  expression: (TS_SUM(MAX((DELAY(CLOSE, 1) - CLOSE), 0), 20) / (TS_SUM(ABS((CLOSE
+    - DELAY(CLOSE, 1))), 20) + 1e-12))
+  explanation: 该因子刻画过去20日下跌幅度在总价变动中的占比，用于衡量近期下行压力与悲观情绪强弱，数值越大表示下跌主导且负向动量更强。
+- name: alpha158_sumn30
+  expression: (TS_SUM(MAX((DELAY(CLOSE, 1) - CLOSE), 0), 30) / (TS_SUM(ABS((CLOSE
+    - DELAY(CLOSE, 1))), 30) + 1e-12))
+  explanation: 该因子衡量过去30日收盘价总绝对变动中由下跌贡献的比例，高值表示下行压力偏强、市场偏空，低值则表明上行动能占优。
+- name: alpha158_sumn60
+  expression: (TS_SUM(MAX((DELAY(CLOSE, 1) - CLOSE), 0), 60) / (TS_SUM(ABS((CLOSE
+    - DELAY(CLOSE, 1))), 60) + 1e-12))
+  explanation: 该因子衡量过去60日价格下跌幅度在总波动中的占比，比例越高代表下行压力与风险厌恶更强、负向动量更显著。
+- name: alpha158_sumd5
+  expression: ((TS_SUM(MAX((CLOSE - DELAY(CLOSE, 1)), 0), 5) - TS_SUM(MAX((DELAY(CLOSE,
+    1) - CLOSE), 0), 5)) / (TS_SUM(ABS((CLOSE - DELAY(CLOSE, 1))), 5) + 1e-12))
+  explanation: 该因子度量过去5日价格上涨与下跌累积幅度之差占总波动的比例，反映短期买卖力量与资金偏好（买压占优为正、卖压占优为负）。
+- name: alpha158_sumd10
+  expression: ((TS_SUM(MAX((CLOSE - DELAY(CLOSE, 1)), 0), 10) - TS_SUM(MAX((DELAY(CLOSE,
+    1) - CLOSE), 0), 10)) / (TS_SUM(ABS((CLOSE - DELAY(CLOSE, 1))), 10) + 1e-12))
+  explanation: 衡量近10日上涨与下跌幅度之差占总波动的比例，刻画短期买卖力量对比与价格动量强弱，数值越高代表买盘占优、上涨趋势更强。
+- name: alpha158_sumd20
+  expression: ((TS_SUM(MAX((CLOSE - DELAY(CLOSE, 1)), 0), 20) - TS_SUM(MAX((DELAY(CLOSE,
+    1) - CLOSE), 0), 20)) / (TS_SUM(ABS((CLOSE - DELAY(CLOSE, 1))), 20) + 1e-12))
+  explanation: 该因子衡量近20日价格涨跌幅的相对强弱（归一到[-1,1]），反映短期动能与买卖力量平衡，值越高表示买盘占优、上行动能更强。
+- name: alpha158_sumd30
+  expression: ((TS_SUM(MAX((CLOSE - DELAY(CLOSE, 1)), 0), 30) - TS_SUM(MAX((DELAY(CLOSE,
+    1) - CLOSE), 0), 30)) / (TS_SUM(ABS((CLOSE - DELAY(CLOSE, 1))), 30) + 1e-12))
+  explanation: 该因子以近30日上涨与下跌幅度的净占比（归一化RSI）刻画短期价格动量与买卖力量不对称，值越高说明买压更强、上涨延续的可能性更大。
+- name: alpha158_sumd60
+  expression: ((TS_SUM(MAX((CLOSE - DELAY(CLOSE, 1)), 0), 60) - TS_SUM(MAX((DELAY(CLOSE,
+    1) - CLOSE), 0), 60)) / (TS_SUM(ABS((CLOSE - DELAY(CLOSE, 1))), 60) + 1e-12))
+  explanation: 该因子通过比较近60日累计上涨与下跌幅度之差占总波动的比重来刻画净买卖压力与趋势强度，数值越高代表买方占优、上行趋势更强，越低则卖方占优。
+- name: alpha158_vma5
+  expression: (TS_MEAN(VOLUME, 5) / (VOLUME + 1e-12))
+  explanation: 该因子刻画当前成交量相对近5日平均成交量的偏离程度，值大于1表示量缩（当前低于均量）、小于1表示放量，反映短期流动性与市场关注度变化。
+- name: alpha158_vma10
+  expression: (TS_MEAN(VOLUME, 10) / (VOLUME + 1e-12))
+  explanation: 该因子以近10日成交量均值除以当日成交量来衡量相对交易活跃度与流动性，值越低表示当日放量（信息到达/关注度提升、潜在流动性冲击），值越高表示缩量（关注度下降、流动性偏弱）。
+- name: alpha158_vma20
+  expression: (TS_MEAN(VOLUME, 20) / (VOLUME + 1e-12))
+  explanation: 该因子刻画当前成交量相对20日均量的偏离程度，值越大表示当前量低于常态、流动性偏弱，值越小表示放量、市场关注与潜在价格冲击上升。
+- name: alpha158_vma30
+  expression: (TS_MEAN(VOLUME, 30) / (VOLUME + 1e-12))
+  explanation: 该因子以近30日成交量均值与当日成交量之比刻画当前交易活跃度的异常程度，值越低表示放量（信息到达、关注度上升、流动性增强），值越高表示缩量（关注度下降、流动性偏弱）。
+- name: alpha158_vma60
+  expression: (TS_MEAN(VOLUME, 60) / (VOLUME + 1e-12))
+  explanation: 该因子以60日均量除以当日成交量，刻画相对成交活跃度与流动性：值越大表示当前缩量、关注度偏低，值越小表示放量、资金关注度提升或信息冲击更强。
+- name: alpha158_vstd5
+  expression: (TS_STDDEV(VOLUME, 5) / (VOLUME + 1e-12))
+  explanation: 该因子衡量近5日成交量相对当前水平的波动性，数值越大表示交易活跃度与流动性更不稳定、资金进出波动更大。
+- name: alpha158_vstd10
+  expression: (TS_STDDEV(VOLUME, 10) / (VOLUME + 1e-12))
+  explanation: 该因子衡量近10日成交量相对当前成交量的波动幅度，数值越大表示交易活跃度更不稳定、潜在流动性冲击风险更高。
+- name: alpha158_vstd20
+  expression: (TS_STDDEV(VOLUME, 20) / (VOLUME + 1e-12))
+  explanation: 衡量近20日成交量波动相对于当日成交量的强度，反映流动性稳定性与交易参与不确定性，数值越大表示近期量能起伏大而当日量能偏弱、流动性风险更高。
+- name: alpha158_vstd30
+  expression: (TS_STDDEV(VOLUME, 30) / (VOLUME + 1e-12))
+  explanation: 衡量近30日成交量相对当前成交量的波动强度，数值越高意味着流动性更不稳定、资金关注度起伏大及潜在交易成本与信息冲击风险更高。
+- name: alpha158_vstd60
+  expression: (TS_STDDEV(VOLUME, 60) / (VOLUME + 1e-12))
+  explanation: 该因子衡量过去60期成交量波动性相对于当期成交量的比例，数值越大意味着当期成交量相对其历史波动偏低、流动性更不稳定且潜在价格冲击风险更高。
+- name: alpha158_wvma5
+  expression: (TS_STDDEV((ABS(((CLOSE / DELAY(CLOSE, 1)) - 1)) * VOLUME), 5) / (TS_MEAN((ABS(((CLOSE
+    / DELAY(CLOSE, 1)) - 1)) * VOLUME), 5) + 1e-12))
+  explanation: 该因子以近5日“绝对收益×成交量”的标准差与均值之比刻画交易活跃度与价格冲击的相对不稳定性（变异系数），值越大表示短期交易压力更剧烈、流动性更脆弱、风险更高。
+- name: alpha158_wvma10
+  expression: (TS_STDDEV((ABS(((CLOSE / DELAY(CLOSE, 1)) - 1)) * VOLUME), 10) / (TS_MEAN((ABS(((CLOSE
+    / DELAY(CLOSE, 1)) - 1)) * VOLUME), 10) + 1e-12))
+  explanation: 该因子是10日内“绝对收益×成交量”的变异系数，刻画由价格变动引致的交易活跃度与流动性需求的相对不稳定性，高值意味着成交与波动更具突发性、情绪更不稳。
+- name: alpha158_wvma20
+  expression: (TS_STDDEV((ABS(((CLOSE / DELAY(CLOSE, 1)) - 1)) * VOLUME), 20) / (TS_MEAN((ABS(((CLOSE
+    / DELAY(CLOSE, 1)) - 1)) * VOLUME), 20) + 1e-12))
+  explanation: 该因子衡量过去20日“绝对收益×成交量”的变异系数，刻画量价冲击强度的相对不稳定性，数值越高意味着流动性与波动更易骤变。
+- name: alpha158_wvma30
+  expression: (TS_STDDEV((ABS(((CLOSE / DELAY(CLOSE, 1)) - 1)) * VOLUME), 30) / (TS_MEAN((ABS(((CLOSE
+    / DELAY(CLOSE, 1)) - 1)) * VOLUME), 30) + 1e-12))
+  explanation: 该因子是过去30日“|收益|×成交量”的变动系数，衡量流动性调整后的价格波动稳定性，值越大表示交易冲击更不均衡、市场情绪与流动性波动更剧烈。
+- name: alpha158_wvma60
+  expression: (TS_STDDEV((ABS(((CLOSE / DELAY(CLOSE, 1)) - 1)) * VOLUME), 60) / (TS_MEAN((ABS(((CLOSE
+    / DELAY(CLOSE, 1)) - 1)) * VOLUME), 60) + 1e-12))
+  explanation: 该因子衡量过去60日“绝对收益×成交量”的波动系数，反映价格变动强度与交易活跃度耦合的稳定性，数值越高意味着交易冲击更剧烈、市场不确定性与流动性风险更高。
+- name: alpha158_vsump5
+  expression: (TS_SUM(MAX((VOLUME - DELAY(VOLUME, 1)), 0), 5) / (TS_SUM(ABS((VOLUME
+    - DELAY(VOLUME, 1))), 5) + 1e-12))
+  explanation: 衡量过去5个交易日里成交量上升变动在总变动中的占比，以刻画交易活跃度的上行趋势强弱，数值越大通常意味着市场参与度与买兴增强、风险偏好回升。
+- name: alpha158_vsump10
+  expression: (TS_SUM(MAX((VOLUME - DELAY(VOLUME, 1)), 0), 10) / (TS_SUM(ABS((VOLUME
+    - DELAY(VOLUME, 1))), 10) + 1e-12))
+  explanation: 该因子衡量过去10日成交量变化的上行占比（成交量增加的累计幅度占总变动的比重），值越高表示市场参与度与流动性持续扩张、交易活跃度增强，值越低则反映收缩。
+- name: alpha158_vsump20
+  expression: (TS_SUM(MAX((VOLUME - DELAY(VOLUME, 1)), 0), 20) / (TS_SUM(ABS((VOLUME
+    - DELAY(VOLUME, 1))), 20) + 1e-12))
+  explanation: 刻画过去20日成交量变化中正向增量占比的强弱，数值越高说明成交量更常上升、投资者关注度与流动性呈持续增强。
+- name: alpha158_vsump30
+  expression: (TS_SUM(MAX((VOLUME - DELAY(VOLUME, 1)), 0), 30) / (TS_SUM(ABS((VOLUME
+    - DELAY(VOLUME, 1))), 30) + 1e-12))
+  explanation: 该因子衡量过去30日成交量日度变动中“上升”部分占总变动的比例，值越高说明成交量更偏向上行、市场关注度与资金活跃度提升，值越低则反映热度与流动性走弱。
+- name: alpha158_vsump60
+  expression: (TS_SUM(MAX((VOLUME - DELAY(VOLUME, 1)), 0), 60) / (TS_SUM(ABS((VOLUME
+    - DELAY(VOLUME, 1))), 60) + 1e-12))
+  explanation: 该因子度量近60日成交量变动中“增加”的占比，反映交易活跃度与流动性扩张的持续性，数值越高通常意味着市场关注与资金参与增强、情绪偏多并可能支持后续动量。
+- name: alpha158_vsumn5
+  expression: (TS_SUM(MAX((DELAY(VOLUME, 1) - VOLUME), 0), 5) / (TS_SUM(ABS((VOLUME
+    - DELAY(VOLUME, 1))), 5) + 1e-12))
+  explanation: 该因子衡量近5日成交量变动中由下降部分的占比，数值越高意味着成交活跃度持续走弱、市场交易意愿与流动性趋于收缩。
+- name: alpha158_vsumn10
+  expression: (TS_SUM(MAX((DELAY(VOLUME, 1) - VOLUME), 0), 10) / (TS_SUM(ABS((VOLUME
+    - DELAY(VOLUME, 1))), 10) + 1e-12))
+  explanation: 该因子衡量近10日成交量变动中由“缩量”贡献的比例，值越高表明交投活跃度持续走弱、投资者参与意愿下降，可能预示情绪趋谨慎与动能衰减。
+- name: alpha158_vsumn20
+  expression: (TS_SUM(MAX((DELAY(VOLUME, 1) - VOLUME), 0), 20) / (TS_SUM(ABS((VOLUME
+    - DELAY(VOLUME, 1))), 20) + 1e-12))
+  explanation: 该因子衡量近20日成交量变动中“缩量”的相对占比，数值越高意味着成交量持续收缩、市场流动性与风险偏好走弱。
+- name: alpha158_vsumn30
+  expression: (TS_SUM(MAX((DELAY(VOLUME, 1) - VOLUME), 0), 30) / (TS_SUM(ABS((VOLUME
+    - DELAY(VOLUME, 1))), 30) + 1e-12))
+  explanation: 该因子衡量过去30日成交量日度变化中“下降”部分的占比，比例越高表明成交量持续缩减、流动性与参与度走弱，越低则显示量能扩张。
+- name: alpha158_vsumn60
+  expression: (TS_SUM(MAX((DELAY(VOLUME, 1) - VOLUME), 0), 60) / (TS_SUM(ABS((VOLUME
+    - DELAY(VOLUME, 1))), 60) + 1e-12))
+  explanation: 该因子衡量过去60日成交量变动中由下降贡献的比例，数值越高说明成交量更常或更大幅度地收缩、交易兴趣与流动性走弱，越低则反映成交量扩张与风险偏好改善。
+- name: alpha158_vsumd5
+  expression: ((TS_SUM(MAX((VOLUME - DELAY(VOLUME, 1)), 0), 5) - TS_SUM(MAX((DELAY(VOLUME,
+    1) - VOLUME), 0), 5)) / (TS_SUM(ABS((VOLUME - DELAY(VOLUME, 1))), 5) + 1e-12))
+  explanation: 该因子通过比较近5日成交量上升与下降的归一化差额来刻画市场参与热度的动量强弱，值高代表量能持续放大、资金关注度提升，值低则量能走弱、关注度下降。
+- name: alpha158_vsumd10
+  expression: ((TS_SUM(MAX((VOLUME - DELAY(VOLUME, 1)), 0), 10) - TS_SUM(MAX((DELAY(VOLUME,
+    1) - VOLUME), 0), 10)) / (TS_SUM(ABS((VOLUME - DELAY(VOLUME, 1))), 10) + 1e-12))
+  explanation: 该因子衡量过去10日成交量变化的方向性与强度（类似成交量的RSI），反映市场参与度与资金关注度的趋势动量，值越高表示成交量持续放大、流动性增强。
+- name: alpha158_vsumd20
+  expression: ((TS_SUM(MAX((VOLUME - DELAY(VOLUME, 1)), 0), 20) - TS_SUM(MAX((DELAY(VOLUME,
+    1) - VOLUME), 0), 20)) / (TS_SUM(ABS((VOLUME - DELAY(VOLUME, 1))), 20) + 1e-12))
+  explanation: 该因子衡量近20日成交量上升与下降的净占比，反映市场参与度与流动性的持续性变化，值越高表示资金关注与交易活跃度持续增强、需求累积，值越低则相反。
+- name: alpha158_vsumd30
+  expression: ((TS_SUM(MAX((VOLUME - DELAY(VOLUME, 1)), 0), 30) - TS_SUM(MAX((DELAY(VOLUME,
+    1) - VOLUME), 0), 30)) / (TS_SUM(ABS((VOLUME - DELAY(VOLUME, 1))), 30) + 1e-12))
+  explanation: 该因子衡量近30日成交量正向与负向变动的归一化净值，高值表示成交量持续放大、市场参与度与流动性增强，低值则表示成交量走弱、关注度下降。
+- name: alpha158_vsumd60
+  expression: ((TS_SUM(MAX((VOLUME - DELAY(VOLUME, 1)), 0), 60) - TS_SUM(MAX((DELAY(VOLUME,
+    1) - VOLUME), 0), 60)) / (TS_SUM(ABS((VOLUME - DELAY(VOLUME, 1))), 60) + 1e-12))
+  explanation: 该因子衡量近60日成交量变动的方向性强度（净增量相对总变动），数值越高表示成交量持续上升、市场关注与流动性增强，越低则代表兴趣减弱与流动性走弱。
+- name: LLM_Factor1
+  expression: TS_RANK(DECAY_LINEAR(((VWAP - CLOSE) / (ABS((HIGH - LOW)) + 1e-12)),
+    5), 20)
+  explanation: 衡量收盘价相对VWAP的尾盘偏离程度并做短期平滑，反映尾盘主导资金的偏向与潜在反转压力。
+- name: LLM_Factor2
+  expression: DECAY_LINEAR((((HIGH - CLOSE) - (OPEN - LOW)) / (ABS((HIGH - LOW)) +
+    1e-12)), 5)
+  explanation: 以上影与下影的相对强弱衡量日内资金回吐与承接的失衡，反映短线反转倾向。
+- name: LLM_Factor3
+  expression: DECAY_LINEAR((((HIGH - MAX(OPEN, CLOSE)) - ((OPEN + CLOSE - MAX(OPEN,
+    CLOSE)) - LOW)) / (ABS((HIGH - LOW)) + 1e-12)), 5)
+  explanation: 以上影与下影差占当日振幅的比例衡量买卖压力的不对称性。
+- name: LLM_Factor4
+  expression: (TS_ARGMAX(ABS(RET), 30) / 30)
+  explanation: 衡量距最近一次极端收益冲击的时间，新鲜度越高影响越大。
+- name: LLM_Factor5
+  expression: CORREL((((HIGH - LOW) / (VWAP + 1e-12))), DELAY((((HIGH - LOW) / (VWAP
+    + 1e-12))), 1), 15)
+  explanation: 衡量经价格标准化后的振幅自相关，刻画波动聚类特征。
+- name: LLM_Factor6
+  expression: REPLACE_NAN_INF(CORREL(RET, (VWAP - OPEN), 12), 0)
+  explanation: 衡量收益与VWAP相对开盘的位移是否同向，刻画日内主导资金方向。
+- name: LLM_Factor7
+  expression: REPLACE_NAN_INF(CORREL((HIGH - LOW), ABS((CLOSE - VWAP)), 15), 0)
+  explanation: 振幅与收盘偏离均价的相关性，刻画大波动是否伴随收尾方向性偏移。
+- name: LLM_Factor8
+  expression: REPLACE_NAN_INF(CORREL((CLOSE - VWAP), DELAY((CLOSE - VWAP), 1), 10),
+    0)
+  explanation: 收盘相对均价偏离的自相关度，衡量均值回归或持续偏离的特征。
+- name: LLM_Factor9
+  expression: ((ABS((CLOSE - DELAY(CLOSE, 20))) + 1e-12) / (TS_SUM(ABS((CLOSE - DELAY(CLOSE,
+    1))), 20) + 1e-12))
+  explanation: 以净变动占总波动衡量价格行进效率，数值越高代表趋势更直。
+- name: LLM_Factor10
+  expression: TS_MEAN(((OPEN - LOW) / (ABS((HIGH - LOW)) + 1e-12)), 20)
+  explanation: 统计开盘价在当日区间中的相对位置均值，反映开盘定价的偏向。
+- name: LLM_Factor11
+  expression: TS_MEAN(SIGN(((HIGH - MAX(OPEN, CLOSE)) - (MIN(OPEN, CLOSE) - LOW))),
+    15)
+  explanation: 统计上影线与下影线强弱的平均偏向，刻画盘中抛压与承接的不平衡。
+- name: LLM_Factor12
+  expression: REPLACE_NAN_INF(CORREL(VOLUME, ABS((CLOSE - DELAY(CLOSE, 1))), 12),
+    0)
+  explanation: 成交量与绝对收益的相关性，捕捉量价共振的强弱。
+- name: LLM_Factor13
+  expression: (DECAY_LINEAR(((CLOSE - VWAP) / (ABS(VWAP) + 1e-12)), 10) * IF(LT(TS_STDDEV(RET,
+    10), TS_STDDEV(RET, 60)), 1, 0))
+  explanation: 在低波动阶段强化的收盘价相对VWAP偏离的平滑度量，刻画资金围绕均衡价的偏离持续性。
+- name: LLM_Factor14
+  expression: REPLACE_NAN_INF(CORREL(((HIGH - LOW) / (ABS(VWAP) + 1e-12)), VOLUME,
+    20), 0)
+  explanation: 波动区间对成交量的弹性相关性，衡量放量是否伴随有效价格扩张。
+- name: LLM_Factor15
+  expression: TS_MEAN(IF(GT((HIGH - LOW), TS_MEAN((HIGH - LOW), 10)), ((CLOSE - LOW)
+    / (ABS((HIGH - LOW)) + 1e-12)), 0), 20)
+  explanation: 在波动放大日统计收盘相对区间的偏位，捕捉大幅波动期的强弱分布。
+- name: LLM_Factor16
+  expression: IF(LT(TS_STDDEV(RET, 20), TS_MEAN(ABS(RET), 20)), (ABS((CLOSE - DELAY(CLOSE,
+    1))) / (TS_STDDEV(RET, 20) + 1e-12)), 0)
+  explanation: 仅在低波动压缩期统计单日突破强度，识别压缩后的动能释放。
+- name: LLM_Factor17
+  expression: DECAY_LINEAR(((((MIN(OPEN, CLOSE) - LOW) - (HIGH - MAX(OPEN, CLOSE)))
+    / (ABS((HIGH - LOW)) + 1e-12)) * (TS_RANK(VOLUME, 60) - 0.5)), 5)
+  explanation: 成交量权重的上下影线不对称度，用于识别低位承接与高位抛压强弱。
+- name: LLM_Factor18
+  expression: (TS_ARGMAX((ABS((CLOSE - VWAP)) / (ABS((HIGH - LOW)) + 1e-12)), 20)
+    / 20)
+  explanation: 最近20期收盘相对VWAP最大错位的时距归一，衡量异常错位的新鲜度。
+- name: LLM_Factor19
+  expression: TS_LINEAR_REGRESSION_R2(VWAP, 30)
+  explanation: 衡量VWAP在中期内的线性单调性，趋势越顺畅R2越高。
+- name: LLM_Factor20
+  expression: TS_STDDEV(RET, 10) / (TS_STDDEV(RET, 60) + 1e-12)
+  explanation: 刻画短期相对长期的波动压缩或扩张，数值越高说明处于噪声放大期。
+- name: LLM_Factor21
+  expression: TS_MEAN(ABS(CLOSE - TS_MEAN(CLOSE, 10)) / TS_STDDEV(CLOSE, 10), 5)
+  explanation: 短期价格偏离均值的标准化绝对偏差滚动均值，衡量价格在波动率调整下的持续偏离程度。
+- name: LLM_Factor22
+  expression: (TS_MAX(AMOUNT, 15) - TS_MIN(AMOUNT, 15)) / (TS_MEAN(AMOUNT, 15) + 1e-12)
+  explanation: 衡量成交额在短期内的极差相对均值的变化，识别资金流动的剧烈波动。
+- name: LLM_Factor23
+  expression: TS_QUANTILE(AMOUNT, 30, 0.8) / TS_MEAN(AMOUNT, 30)
+  explanation: 比较成交金额的历史高位与均值的相对水平，评估资金流入的极端程度。
+- name: LLM_Factor24
+  expression: TS_MEAN(ABS(CLOSE - TS_MEAN(CLOSE, 10)) / TS_STDDEV(CLOSE, 10), 15)
+  explanation: 价格偏离均值的标准化波动均值，衡量价格的均值回归强度。
+- name: LLM_Factor25
+  expression: (TS_QUANTILE(AMOUNT, 15, 0.6) - TS_QUANTILE(AMOUNT, 15, 0.4)) / TS_MEAN(VOLUME,
+    15)
+  explanation: 成交金额分布中间区域的集中度经成交量标准化，反映大单活跃度的分布均匀性特征。
+- name: LLM_Factor26
+  expression: (TS_MEAN(ABS(CLOSE - TS_MEAN(CLOSE, 20)), 5) / TS_STDDEV(CLOSE, 20))
+  explanation: 短期均值偏离度与长期波动率的标准化比值，识别波动收敛中的异动起点。
+- name: LLM_Factor27
+  expression: SIGN(VWAP - CLOSE) * TS_RANK(ABS(HIGH - LOW), 10)
+  explanation: 结合均价相对位置与波动率排名，捕捉价格偏离成本时的波动扩张效应。
+- name: LLM_Factor28
+  expression: CORREL(TS_MEAN(OPEN, 5), TS_MEAN(CLOSE, 5), 10)
+  explanation: 开盘价与收盘价短期均值的滚动相关性，捕捉盘面价格一致性的变化。
+- name: LLM_Factor29
+  expression: DECAY_LINEAR(RANK(TS_LINEAR_REGRESSION_RESI(OPEN, 10, CLOSE)), 6)
+  explanation: 分析开盘价相对收盘价趋势的残差排名衰减，捕捉开盘跳空后的价格修正倾向。
+- name: LLM_Factor30
+  expression: RANK(IF(GT(VOLUME, TS_MEAN(VOLUME, 20)), TS_MEAN(CLOSE, 5) / TS_MEAN(CLOSE,
+    20), TS_STDDEV(CLOSE, 10) / CLOSE))
+  explanation: 结合成交量筛选的短期动量与波动率调整因子，高成交量时侧重短期价格趋势，低成交量时侧重价格波动以捕捉不同市场状态下的alpha。
+- name: LLM_Factor31
+  expression: CORREL(TS_MEAN(VOLUME, 5), TS_MEAN((HIGH - LOW) / OPEN, 5), 15)
+  explanation: 该因子度量短期平均成交量与波动率的相关性，反映资金流动与价格波动之间的动态关联。
+- name: LLM_Factor32
+  expression: (TS_QUANTILE(AMOUNT, 30, 0.8) - TS_QUANTILE(AMOUNT, 30, 0.2)) / TS_MEAN(AMOUNT,
+    30)
+  explanation: 成交额分布宽度与均值的标准化比值，识别大额交易活跃度差异，反映机构资金参与度的极端变化。
+- name: LLM_Factor33
+  expression: IF(GT(TS_ARGMIN(LOW, 10), TS_ARGMAX(HIGH, 10)), 1, -1) * (CLOSE / TS_MEAN(CLOSE,
+    10) - 1)
+  explanation: 该因子结合近期高低点出现时序与价格偏离度，捕捉趋势延续或反转的信号。
+- name: LLM_Factor34
+  expression: DECAY_LINEAR(IF(GT(TS_MAX(CLOSE, 5), DELAY(CLOSE, 5)), (HIGH - LOW)
+    / CLOSE, (LOW - HIGH) / CLOSE), 10)
+  explanation: 基于近期价格是否创新高/新低，动态调整波动率方向，捕捉突破或反转信号。
+- name: LLM_Factor35
+  expression: TS_QUANTILE(VOLUME, 20, 0.75) / TS_QUANTILE(VOLUME, 20, 0.25)
+  explanation: 成交量分布的分位数比值，反映交易活跃度的稳定性和极端值影响。
+- name: LLM_Factor36
+  expression: CORREL(RANK(HIGH - LOW), RANK(TS_MEAN(AMOUNT, 10)), 8)
+  explanation: 分析振幅排名与成交额排名间的滚动相关性，捕捉价量分布结构的一致性变化。
+- name: LLM_Factor37
+  expression: TS_LINEAR_REGRESSION_RESI(HIGH - LOW, 15, VWAP) / TS_MEAN(VOLUME, 15)
+  explanation: 衡量日内波动相对VWAP的异常残差并以成交量标准化，识别非理性波动中的定价偏差。
+- name: LLM_Factor38
+  expression: RANK(DECAY_LINEAR((VWAP - TS_MEAN(CLOSE, 10)) / (TS_STDDEV(CLOSE, 10)
+    + 1e-12), 5))
+  explanation: 该因子衡量VWAP相对短期均线的标准化偏离，并随时间衰减加权，反映机构成本与市场均值的动态偏离及均值回归压力。
+- name: LLM_Factor39
+  expression: DECAY_LINEAR(TS_QUANTILE(AMOUNT, 15, 0.9) / TS_QUANTILE(AMOUNT, 15,
+    0.1), 8)
+  explanation: 该因子通过金额分布极端值的比值衰减，衡量资金分布不均匀性的持续性，识别资金集中度稳定的个股。
+- name: LLM_Factor40
+  expression: (TS_SUM(ABS(CLOSE - TS_MEAN(CLOSE, 10)), 15) / (TS_SUM(ABS(CLOSE - DELAY(CLOSE,
+    1)), 15) + 1e-12))
+  explanation: 近期累计绝对偏离均值与日内绝对收益的比率，衡量价格均值回归强度相对于噪声波动的显著性。
+- name: LLM_Factor41
+  expression: (TS_QUANTILE(VOLUME, 15, 0.8) - TS_QUANTILE(VOLUME, 15, 0.2)) / (TS_MEAN(VOLUME,
+    15) + 1e-12) * RANK(CLOSE / TS_MEAN(CLOSE, 20) - 1)
+  explanation: 该因子将成交量分位距的相对宽度与价格相对位置的秩结合，捕捉成交量分布宽度与价格趋势强度的协同效应，反映流动性广度与价格动量的联动。
+- name: LLM_Factor42
+  expression: IF(GT(CORREL(RET, VOLUME, 10), 0), TS_MEAN(RET, 10), TS_STDDEV(RET,
+    10))
+  explanation: 该因子在量价正相关时取收益均值代表动量，否则取收益波动率代表不确定性，动态选择因子敞口以适应市场状态。
+- name: LLM_Factor43
+  expression: IF(LT(TS_STDDEV(RET, 5), TS_STDDEV(RET, 20)), CORREL(OPEN, CLOSE, 10),
+    CORREL(HIGH, LOW, 10))
+  explanation: 该因子在短期波动较低时度量开盘收盘相关性，否则度量高低点相关性，适应不同波动环境下的价格结构特征，反映市场状态的自适应切换能力。

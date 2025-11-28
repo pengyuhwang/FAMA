@@ -19,6 +19,8 @@ factor_value_prepared/factor_ric.csv
 data/data_test.ipynb
 data/factor_values
 data/factor_cache
+data/base_factors
+data/factor_cache_new
 
 alphatest/data
 alphatest/alphatest
@@ -26,6 +28,8 @@ alphatest/analyze.ipynb
 alphatest/fzq_backtrader_test.ipynb
 alphatest/RankIC-EfficientCalculator.csv
 alphatest/ts_ic_alpha101_1.csv
+
+scripts
 
 RankIC/factor_ric.csv
 

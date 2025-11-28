@@ -9,7 +9,7 @@ from typing import Dict, List, Tuple
 import numpy as np
 import pandas as pd
 from KunQuant.Driver import KunCompilerConfig
-from KunQuant.Op import Builder, ConstantOp, Input, Output, Rank, Scale
+from KunQuant.Op import BoolOpTrait, Builder, ConstantOp, Input, Output, Rank, Scale
 from KunQuant.Stage import Function
 from KunQuant.jit import cfake
 from KunQuant.ops.CompOp import (
@@ -82,18 +82,37 @@ ADV_WINDOWS = (5, 10, 15, 20, 30, 40, 50, 60, 120, 180)
 DSL_FUNCTIONS: Dict[str, callable] = {}
 
 
-def _register_ops() -> None:
-    def _ensure_expr(value):
-        if isinstance(value, (int, float)):
-            return ConstantOp(float(value))
-        return value
+def _ensure_expr(value):
+    if isinstance(value, (int, float)):
+        return ConstantOp(float(value))
+    return value
 
-    def _ensure_condition(value):
-        return _ensure_expr(value)
+
+def _ensure_numeric(value):
+    """Cast numbers to ConstantOp and boolean masks to 0/1 float."""
+    expr = _ensure_expr(value)
+    if isinstance(expr, BoolOpTrait):
+        return Select(expr, ConstantOp(1.0), ConstantOp(0.0))
+    return expr
+
+
+def _ensure_condition(value):
+    expr = _ensure_expr(value)
+    if isinstance(expr, BoolOpTrait):
+        return expr
+    # Treat any non-zero value as True to satisfy KunQuant's bool mask.
+    return OpNot(OpEquals(expr, ConstantOp(0.0)))
+
+
+def _register_ops() -> None:
 
     def _if_then_else(cond, a, b):
         cond_mask = _ensure_condition(cond)
-        return Select(cond_mask, _ensure_expr(a), _ensure_expr(b))
+        true_v = _ensure_expr(a)
+        false_v = _ensure_expr(b)
+        mask_float = Select(cond_mask, ConstantOp(1.0), ConstantOp(0.0))
+        inv_mask = OpSub(ConstantOp(1.0), mask_float)
+        return OpAdd(OpMul(mask_float, true_v), OpMul(inv_mask, false_v))
 
     def _logical_and(x, y):
         return OpAnd(_ensure_condition(x), _ensure_condition(y))
@@ -105,10 +124,10 @@ def _register_ops() -> None:
         return OpNot(_ensure_condition(x))
 
     def _ts_rank(expr, window):
-        return TsRank(_ensure_expr(expr), _to_int(window))
+        return TsRank(_ensure_numeric(expr), _to_int(window))
 
     def _decay_linear(expr, window):
-        return DecayLinear(_ensure_expr(expr), _to_int(window))
+        return DecayLinear(_ensure_numeric(expr), _to_int(window))
 
     def _dsl_safe_div(*args):
         if len(args) < 2:
@@ -116,8 +135,8 @@ def _register_ops() -> None:
         numerator, denominator = args[0], args[1]
         eps = _to_float(args[2]) if len(args) >= 3 else 1e-4
         fill = _to_float(args[3]) if len(args) >= 4 else 0.0
-        num_expr = _ensure_expr(numerator)
-        denom_expr = _ensure_expr(denominator)
+        num_expr = _ensure_numeric(numerator)
+        denom_expr = _ensure_numeric(denominator)
         eps_const = ConstantOp(float(eps))
         safe_denom = Select(OpEquals(denom_expr, ConstantOp(0.0)), eps_const, denom_expr)
         ratio = OpDiv(num_expr, safe_denom)
@@ -125,23 +144,23 @@ def _register_ops() -> None:
 
     DSL_FUNCTIONS.update(
         {
-            "RANK": lambda x: Rank(_ensure_expr(x)),
-            "DELTA": lambda x, n=1: OpSub(_ensure_expr(x), BackRef(_ensure_expr(x), _to_int(n))),
-            "TS_MEAN": lambda x, n: WindowedAvg(_ensure_expr(x), _to_int(n)),
-            "TS_STDDEV": lambda x, n: WindowedStddev(_ensure_expr(x), _to_int(n)),
-            "CORREL": lambda x, y, n: WindowedCorrelation(_ensure_expr(x), _to_int(n), _ensure_expr(y)),
-            "SIGN": lambda x: OpSign(_ensure_expr(x)),
-            "ABS": lambda x: OpAbs(_ensure_expr(x)),
-            "DELAY": lambda x, n=1: BackRef(_ensure_expr(x), _to_int(n)),
-            "TS_SUM": lambda x, n: WindowedSum(_ensure_expr(x), _to_int(n)),
-            "TS_MIN": lambda x, n: WindowedMin(_ensure_expr(x), _to_int(n)),
-            "TS_MAX": lambda x, n: WindowedMax(_ensure_expr(x), _to_int(n)),
-            "TS_PRODUCT": lambda x, n: WindowedProduct(_ensure_expr(x), _to_int(n)),
-            "TS_ARGMAX": lambda x, n: TsArgMax(_ensure_expr(x), _to_int(n)),
-            "TS_ARGMIN": lambda x, n: TsArgMin(_ensure_expr(x), _to_int(n)),
+            "RANK": lambda x: Rank(_ensure_numeric(x)),
+            "DELTA": lambda x, n=1: OpSub(_ensure_numeric(x), BackRef(_ensure_numeric(x), _to_int(n))),
+            "TS_MEAN": lambda x, n: WindowedAvg(_ensure_numeric(x), _to_int(n)),
+            "TS_STDDEV": lambda x, n: WindowedStddev(_ensure_numeric(x), _to_int(n)),
+            "CORREL": lambda x, y, n: WindowedCorrelation(_ensure_numeric(x), _to_int(n), _ensure_numeric(y)),
+            "SIGN": lambda x: OpSign(_ensure_numeric(x)),
+            "ABS": lambda x: OpAbs(_ensure_numeric(x)),
+            "DELAY": lambda x, n=1: BackRef(_ensure_numeric(x), _to_int(n)),
+            "TS_SUM": lambda x, n: WindowedSum(_ensure_numeric(x), _to_int(n)),
+            "TS_MIN": lambda x, n: WindowedMin(_ensure_numeric(x), _to_int(n)),
+            "TS_MAX": lambda x, n: WindowedMax(_ensure_numeric(x), _to_int(n)),
+            "TS_PRODUCT": lambda x, n: WindowedProduct(_ensure_numeric(x), _to_int(n)),
+            "TS_ARGMAX": lambda x, n: TsArgMax(_ensure_numeric(x), _to_int(n)),
+            "TS_ARGMIN": lambda x, n: TsArgMin(_ensure_numeric(x), _to_int(n)),
             "TS_RANK": _ts_rank,
             "DECAY_LINEAR": _decay_linear,
-            "SCALE": lambda x: Scale(_ensure_expr(x)),
+            "SCALE": lambda x: Scale(_ensure_numeric(x)),
             "IF": _if_then_else,
             "AND": _logical_and,
             "OR": _logical_or,
@@ -151,33 +170,33 @@ def _register_ops() -> None:
             "LT": lambda x, y: OpLessThan(_ensure_expr(x), _ensure_expr(y)),
             "LE": lambda x, y: OpLessEqual(_ensure_expr(x), _ensure_expr(y)),
             "EQ": lambda x, y: OpEquals(_ensure_expr(x), _ensure_expr(y)),
-            "MAX": lambda x, y: OpMax(_ensure_expr(x), _ensure_expr(y)),
-            "MIN": lambda x, y: OpMin(_ensure_expr(x), _ensure_expr(y)),
-            "LOG": lambda x: OpLog(_ensure_expr(x)),
-            "EXP": lambda x: OpExp(_ensure_expr(x)),
-            "POW": lambda x, y: OpPow(_ensure_expr(x), _ensure_expr(y)),
-            "REPLACE_NAN_INF": lambda x, value=0.0: SetInfOrNanToValue(_ensure_expr(x), _to_float(value)),
-            "COVAR": lambda x, y, n: WindowedCovariance(_ensure_expr(x), _to_int(n), _ensure_expr(y)),
-            "ADV": lambda x, n: WindowedAvg(_ensure_expr(x), _to_int(n)),
+            "MAX": lambda x, y: OpMax(_ensure_numeric(x), _ensure_numeric(y)),
+            "MIN": lambda x, y: OpMin(_ensure_numeric(x), _ensure_numeric(y)),
+            "LOG": lambda x: OpLog(_ensure_numeric(x)),
+            "EXP": lambda x: OpExp(_ensure_numeric(x)),
+            "POW": lambda x, y: OpPow(_ensure_numeric(x), _ensure_numeric(y)),
+            "REPLACE_NAN_INF": lambda x, value=0.0: SetInfOrNanToValue(_ensure_numeric(x), _to_float(value)),
+            "COVAR": lambda x, y, n: WindowedCovariance(_ensure_numeric(x), _to_int(n), _ensure_numeric(y)),
+            "ADV": lambda x, n: WindowedAvg(_ensure_numeric(x), _to_int(n)),
             "SAFE_DIV": _dsl_safe_div,
-            "CLIP": lambda x, eps=1.0: Clip(_ensure_expr(x), _to_float(eps)),
-            "EMA": lambda x, n: ExpMovingAvg(_ensure_expr(x), _to_int(n)),
-            "EXP_MOVING_AVG": lambda x, n: ExpMovingAvg(_ensure_expr(x), _to_int(n)),
-            "FAST_TS_SUM": lambda x, n: FastWindowedSum(_ensure_expr(x), _to_int(n)),
-            "TS_QUANTILE": lambda x, n, q: WindowedQuantile(_ensure_expr(x), _to_int(n), _to_float(q)),
-            "TS_KURT": lambda x, n: WindowedKurt(_ensure_expr(x), _to_int(n)),
-            "TS_SKEW": lambda x, n: WindowedSkew(_ensure_expr(x), _to_int(n)),
-            "TS_MAXDRAWDOWN": lambda x, n: WindowedMaxDrawdown(_ensure_expr(x), _to_int(n)),
+            "CLIP": lambda x, eps=1.0: Clip(_ensure_numeric(x), _to_float(eps)),
+            "EMA": lambda x, n: ExpMovingAvg(_ensure_numeric(x), _to_int(n)),
+            "EXP_MOVING_AVG": lambda x, n: ExpMovingAvg(_ensure_numeric(x), _to_int(n)),
+            "FAST_TS_SUM": lambda x, n: FastWindowedSum(_ensure_numeric(x), _to_int(n)),
+            "TS_QUANTILE": lambda x, n, q: WindowedQuantile(_ensure_numeric(x), _to_int(n), _to_float(q)),
+            "TS_KURT": lambda x, n: WindowedKurt(_ensure_numeric(x), _to_int(n)),
+            "TS_SKEW": lambda x, n: WindowedSkew(_ensure_numeric(x), _to_int(n)),
+            "TS_MAXDRAWDOWN": lambda x, n: WindowedMaxDrawdown(_ensure_numeric(x), _to_int(n)),
             "TS_LINEAR_REGRESSION_R2": lambda x, n, y=None: WindowedLinearRegressionRSqaure(
-                _ensure_expr(x), _to_int(n), None if y is None else _ensure_expr(y)
+                _ensure_numeric(x), _to_int(n), None if y is None else _ensure_numeric(y)
             ),
             "TS_LINEAR_REGRESSION_SLOPE": lambda x, n, y=None: WindowedLinearRegressionSlope(
-                _ensure_expr(x), _to_int(n), None if y is None else _ensure_expr(y)
+                _ensure_numeric(x), _to_int(n), None if y is None else _ensure_numeric(y)
             ),
             "TS_LINEAR_REGRESSION_RESI": lambda x, n, y=None: WindowedLinearRegressionResi(
-                _ensure_expr(x), _to_int(n), None if y is None else _ensure_expr(y)
+                _ensure_numeric(x), _to_int(n), None if y is None else _ensure_numeric(y)
             ),
-            "DIFF_WITH_WEIGHTED_SUM": lambda v, w: DiffWithWeightedSum(_ensure_expr(v), _ensure_expr(w)),
+            "DIFF_WITH_WEIGHTED_SUM": lambda v, w: DiffWithWeightedSum(_ensure_numeric(v), _ensure_numeric(w)),
         }
     )
 
@@ -214,6 +233,8 @@ def compute_factor_values_kunquant_new(
             except Exception:
                 fallback_exprs.append(expr)
                 continue
+            if isinstance(ir, BoolOpTrait):
+                ir = Select(ir, ConstantOp(1.0), ConstantOp(0.0))
             counter += 1
             compiled_exprs.append(expr)
             Output(ir, f"f_{counter}")
@@ -286,8 +307,8 @@ def _compile_expression(expr: str, env: Dict[str, Input]):
 
 def _eval_ast(node: ast.AST, env: Dict[str, Input]):
     if isinstance(node, ast.BinOp):
-        left = _eval_ast(node.left, env)
-        right = _eval_ast(node.right, env)
+        left = _ensure_numeric(_eval_ast(node.left, env))
+        right = _ensure_numeric(_eval_ast(node.right, env))
         if isinstance(node.op, ast.Add):
             return OpAdd(left, right)
         if isinstance(node.op, ast.Sub):
@@ -300,7 +321,7 @@ def _eval_ast(node: ast.AST, env: Dict[str, Input]):
             return OpPow(left, right)
         raise NotImplementedError(f"Unsupported operator {node.op}")
     if isinstance(node, ast.UnaryOp):
-        operand = _eval_ast(node.operand, env)
+        operand = _ensure_numeric(_eval_ast(node.operand, env))
         if isinstance(node.op, ast.USub):
             return OpSub(ConstantOp(0.0), operand)
         if isinstance(node.op, ast.UAdd):
@@ -327,10 +348,10 @@ def _eval_ast(node: ast.AST, env: Dict[str, Input]):
 
 
 def _power_expr(base, exponent):
-    base_expr = _ensure_expr(base)
+    base_expr = _ensure_numeric(base)
     exp_value = _extract_constant(exponent)
     if exp_value is None:
-        exponent_expr = _ensure_expr(exponent)
+        exponent_expr = _ensure_numeric(exponent)
         return _signed_power(base_expr, exponent_expr)
     if abs(exp_value) < 1e-12:
         return ConstantOp(1.0)
@@ -346,12 +367,6 @@ def _power_expr(base, exponent):
         return result
     exponent_expr = ConstantOp(float(exp_value))
     return _signed_power(base_expr, exponent_expr)
-
-
-def _ensure_expr(value):
-    if isinstance(value, (int, float)):
-        return ConstantOp(float(value))
-    return value
 
 
 def _extract_constant(value):
@@ -375,8 +390,8 @@ def _to_float(value):
 
 
 def _signed_power(base_expr, exponent_expr):
-    base_expr = _ensure_expr(base_expr)
-    exponent_expr = _ensure_expr(exponent_expr)
+    base_expr = _ensure_numeric(base_expr)
+    exponent_expr = _ensure_numeric(exponent_expr)
     abs_base = OpAbs(base_expr)
     safe_base = OpMax(abs_base, ConstantOp(1e-6))
     magnitude = OpExp(OpMul(exponent_expr, OpLog(safe_base)))

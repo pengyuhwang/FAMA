@@ -12,7 +12,7 @@ from pandas.api import types as ptypes
 from fama.factors.alpha_lib import evaluate_expression, list_seed_alphas
 
 try:  # KunQuant 后端为可选依赖
-    from fama.data.kun_backend import compute_factor_values_kunquant
+    from fama.data.kun_backend_new import compute_factor_values_kunquant_new as compute_factor_values_kunquant
 except Exception:  # pragma: no cover
     compute_factor_values_kunquant = None
 

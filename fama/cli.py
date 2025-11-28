@@ -120,4 +120,6 @@ def _merge_dicts(base: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[str, A
 
 
 if __name__ == "__main__":
-    main()
+    for i in range(10):
+        print(f"第{i}次迭代：")
+        main()

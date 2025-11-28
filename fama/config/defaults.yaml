@@ -1,12 +1,12 @@
-k: 7  # target number of clusters for CSS stage
+k: 10  # target number of clusters for CSS stage
 u: 5   # minimum factor count required before CoE expansion
 css:
-  n_select: 7
+  n_select: 10
   similarity_metric: "spearman"
 coe:
   max_depth: 5
   min_rankic: 0.05
-  prompt_chains: 3
+  prompt_chains: 5
   benchmark_assets: ["000852.SH", "000905.SH"]
   prompt_expr_chars: 0
   ric_start_date: "2015-01-01"
@@ -16,19 +16,25 @@ run:
   use_coe: true
 paths:
   market_data: "./data/fof_price_updating.parquet"
-  factor_cache: "/Users/hpy/PycharmProjects/FAMA/data/factor_cache"
+  factor_cache: "/Users/hpy/PycharmProjects/FAMA/data/factor_cache_new/factors.yaml"
+  llm_factor_cache: "/Users/hpy/PycharmProjects/FAMA/data/factor_cache_new/LLM_factors.yaml"
   factor_outputs: "./data/factor_values"
   prompts_dir: "./prompts"
   output_dir: "./artifacts"
-  factor_ric: "./factor_value_prepared/factor_ric.csv"
+  factor_ric: "./factor_value_prepared/data/factors/factor_ric.csv"
 llm:
-  provider: "openai"
-  model: "gpt-5"
-  temperature: 1
+  #provider: "openai"
+  provider: "siliconflow"
+  #model: "gpt-5"
+  model: "Pro/deepseek-ai/DeepSeek-V3.1-Terminus"
+  temperature: 0.7
   thinking: "high"
-  max_new_factors: 20
+  # 针对 OpenAI 兼容接口（如 SiliconFlow/OpenRouter）可配置 base_url
+  base_url: "https://api.siliconflow.cn/v1"
+  max_new_factors: 15
   instructions_path: "./prompts/alpha_prompt_template.txt"
-  api_key_env: "LLM_API_KEY"
+  # api_key_env: "OPENAI_API_KEY"
+  api_key_env: "SiliconFlow_API_KEY"
   operator_whitelist:
     [
       "RANK",
@@ -45,12 +51,14 @@ llm:
       "TS_RANK",
       "CORREL",
       "COVAR",
-      "Z_SCORE",
       "SIGN",
       "ABS",
       "DECAY_LINEAR",
       "SCALE",
       "IF",
+      "AND",
+      "OR",
+      "NOT",
       "GT",
       "GE",
       "LT",
@@ -60,7 +68,22 @@ llm:
       "MIN",
       "LOG",
       "EXP",
+      "POW",
       "REPLACE_NAN_INF",
+      "ADV",
+      "SAFE_DIV",
+      "CLIP",
+      "EMA",
+      "EXP_MOVING_AVG",
+      "FAST_TS_SUM",
+      "TS_QUANTILE",
+      "TS_KURT",
+      "TS_SKEW",
+      "TS_MAXDRAWDOWN",
+      "TS_LINEAR_REGRESSION_R2",
+      "TS_LINEAR_REGRESSION_SLOPE",
+      "TS_LINEAR_REGRESSION_RESI",
+      "DIFF_WITH_WEIGHTED_SUM",
     ]
   deny_fields: []
 logging:

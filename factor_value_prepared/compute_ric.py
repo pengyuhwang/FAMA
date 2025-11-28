@@ -36,7 +36,7 @@ def load_factor_long_csv(path: str) -> pd.DataFrame:
 
 
 # 准备因子数据
-factor_df = read_factor_file("/Users/hpy/PycharmProjects/FAMA/factor_value_prepared/data/factors/dsl_factors.parquet")
+factor_df = read_factor_file("/Users/hpy/PycharmProjects/FAMA/factor_value_prepared/data/factors/dsl_factors_new.parquet")
 
 native_price, price_df, open_price_df, working_days = prepare_price_data(
     data_path="/Users/hpy/PycharmProjects/FAMA/data/fof_price_updating.parquet"

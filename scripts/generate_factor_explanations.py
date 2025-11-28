@@ -21,7 +21,7 @@ def main() -> None:
     parser.add_argument("--config", default="fama/config/defaults.yaml", help="Path to configuration YAML.")
     parser.add_argument(
         "--factor-cache",
-        default="/Users/hpy/PycharmProjects/FAMA/data/factor_cache",
+        default="/Users/hpy/PycharmProjects/FAMA/data/factor_cache_new/factors.yaml",
         help="Optional factor cache path (defaults to config paths.factor_cache).",
     )
     parser.add_argument(
@@ -40,8 +40,8 @@ def main() -> None:
     fs = deserialize_factor_set(str(cache_path))
     llm_cfg = cfg.get("llm", {})
     provider = llm_cfg.get("provider", "openai")
-    model = llm_cfg.get("model", "gpt-4o")
-    temperature = llm_cfg.get("temperature", 0)
+    model = llm_cfg.get("model", "gpt-5")
+    temperature = llm_cfg.get("temperature", 1)
     api_key_env = llm_cfg.get("api_key_env", "LLM_API_KEY")
     api_key = args.api_key or llm_cfg.get("api_key") or os.getenv(api_key_env) or os.getenv("OPENAI_API_KEY")
     logger = get_logger(__name__)

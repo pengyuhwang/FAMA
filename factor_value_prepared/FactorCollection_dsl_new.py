@@ -17,6 +17,8 @@ if str(PROJECT_ROOT) not in sys.path:
 from factor_value_prepared.FactorCollection import FactorCollection
 from fama.data.factor_space import deserialize_factor_set
 from fama.data.kun_backend_new import compute_factor_values_kunquant_new
+from fama.factors.alpha101_extractor import extract_alpha101_expressions
+from fama.utils.io import ensure_dir
 
 
 class FactorCollectionDSLNew(FactorCollection):
@@ -32,9 +34,14 @@ class FactorCollectionDSLNew(FactorCollection):
         with self.config_path.open("r", encoding="utf-8") as fp:
             self.cfg = yaml.safe_load(fp)
 
-        self.factor_cache_path = Path("/Users/hpy/PycharmProjects/FAMA/data/factor_cache_new/factors.yaml")
+        cache_path = (
+            Path(factor_cache_path)
+            if factor_cache_path
+            else Path(self.cfg["paths"].get("factor_cache", "/Users/hpy/PycharmProjects/FAMA/data/factor_cache_new/factors.yaml"))
+        )
+        self.factor_cache_path = cache_path
         if not self.factor_cache_path.exists():
-            raise FileNotFoundError(f"未找到 factor cache: {self.factor_cache_path}")
+            self._regenerate_factor_cache()
 
     def update_dsl_factors(
         self,
@@ -68,6 +75,7 @@ class FactorCollectionDSLNew(FactorCollection):
         expr_to_name = {factor.expression: factor.name for factor in factor_set.factors}
         stacked["factor_tag"] = stacked["factor_tag"].map(expr_to_name).fillna(stacked["factor_tag"])
         stacked = stacked[["time", "unique_id", "factor_tag", "value"]]
+        stacked = stacked.drop_duplicates(subset=["time", "unique_id", "factor_tag"])
 
         save_path = Path(output_path) if output_path else (self.factor_dir / "dsl_factors_new.parquet")
         save_path.parent.mkdir(parents=True, exist_ok=True)
@@ -100,6 +108,22 @@ class FactorCollectionDSLNew(FactorCollection):
         merged = merged.set_index(["time", "unique_id"]).sort_index()
         merged.index.names = ["date", "symbol"]
         return merged
+
+    def _regenerate_factor_cache(self) -> None:
+        """使用 KunQuant 提供的 Alpha101 定义重新导出 factor cache。"""
+
+        expressions = extract_alpha101_expressions()
+        payload = [
+            {
+                "name": expr.name,
+                "expression": expr.expression,
+                "explanation": expr.explanation,
+            }
+            for expr in expressions
+        ]
+        ensure_dir(str(self.factor_cache_path.parent))
+        with self.factor_cache_path.open("w", encoding="utf-8") as fp:
+            yaml.safe_dump(payload, fp, allow_unicode=True, sort_keys=False)
 
 
 if __name__ == "__main__":

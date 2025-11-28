@@ -1,4 +1,4 @@
-from factor_value_prepared.FactorCollection_dsl import FactorCollectionDSL
+from factor_value_prepared.FactorCollection_dsl_new import FactorCollectionDSLNew
 
-factor_collection = FactorCollectionDSL()
+factor_collection = FactorCollectionDSLNew()
 factor_collection.update_dsl_factors()
