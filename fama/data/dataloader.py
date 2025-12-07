@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from pandas.api import types as ptypes
 
-from fama.factors.alpha_lib import evaluate_expression, list_seed_alphas
+from fama.factors.alpha_lib import evaluate_expression, list_seed_alphas, validate_alpha_syntax_strict
 
 try:  # KunQuant 后端为可选依赖
     from fama.data.kun_backend_new import compute_factor_values_kunquant_new as compute_factor_values_kunquant
@@ -88,6 +88,21 @@ def compute_factor_values(
     logger = None
 
     frames: list[pd.DataFrame] = []
+    # 预过滤非法表达式，避免污染后续计算
+    allowed_vars = {c.upper() for c in df.columns} | {"RET", "VWAP"}
+    cleaned: list[str] = []
+    rejected: list[tuple[str, str]] = []
+    for expr in formulas:
+        ok, reason = validate_alpha_syntax_strict(expr, allowed_variables=allowed_vars, allowed_ops=None)
+        if ok:
+            cleaned.append(expr)
+        else:
+            rejected.append((expr, reason or "未知原因"))
+    if rejected:
+        logger = logger or __import__("fama.utils.logging", fromlist=["get_logger"]).get_logger(__name__)
+        for expr, reason in rejected:
+            logger.warning("过滤不合法表达式: %s，原因: %s", expr, reason)
+    formulas = cleaned or []
     if use_kunquant and compute_factor_values_kunquant is not None:
         try:
             threads = int(compute_cfg.get("threads", 4))
@@ -148,13 +163,17 @@ def _compute_factor_values_python(df: "pd.DataFrame", formulas: list[str]) -> "p
         formulas = list_seed_alphas()
 
     context, _ = _build_evaluation_context(df)
+    from fama.utils.logging import get_logger
+
+    logger = get_logger(__name__)
     factor_columns = {}
     for idx, formula in enumerate(formulas):
         label = formula.strip() or f"factor_{idx}"
         try:
             factor_columns[label] = evaluate_expression(formula, context)
         except Exception as exc:  # pragma: no cover - 实际表达式视数据而定
-            raise ValueError(f"因子表达式 {label} 计算失败: {exc}") from exc
+            logger.warning("跳过因子 %s，计算失败: %s", label, exc, exc_info=True)
+            continue
 
     factor_df = pd.DataFrame(factor_columns).sort_index().fillna(0.0)
     return factor_df

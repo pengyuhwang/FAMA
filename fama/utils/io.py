@@ -36,7 +36,7 @@ def write_yaml(path: str, data: dict) -> None:
     yaml_path = Path(path)
     ensure_dir(str(yaml_path.parent))
     with yaml_path.open("w", encoding="utf-8") as handle:
-        yaml.safe_dump(data, handle, sort_keys=True, allow_unicode=False)
+        yaml.safe_dump(data, handle, sort_keys=True, allow_unicode=True)
 
 
 def ensure_dir(path: str) -> None:

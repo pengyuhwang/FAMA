@@ -1,4 +1,4 @@
-k: 10  # target number of clusters for CSS stage
+k: 20  # target number of clusters for CSS stage
 u: 5   # minimum factor count required before CoE expansion
 css:
   n_select: 10
@@ -7,7 +7,8 @@ coe:
   max_depth: 5
   min_rankic: 0.05
   prompt_chains: 5
-  benchmark_assets: ["000852.SH", "000905.SH"]
+  # benchmark_assets: ["000852.SH", "000905.SH"]
+  benchmark_assets: ["000852.SH"]
   prompt_expr_chars: 0
   ric_start_date: "2015-01-01"
   ric_end_date: "2020-12-31"
@@ -23,18 +24,19 @@ paths:
   output_dir: "./artifacts"
   factor_ric: "./factor_value_prepared/data/factors/factor_ric.csv"
 llm:
-  #provider: "openai"
+#  provider: "openai"
+#  model: "gpt-5"
+#  api_key_env: "OPENAI_API_KEY"
   provider: "siliconflow"
-  #model: "gpt-5"
-  model: "Pro/deepseek-ai/DeepSeek-V3.1-Terminus"
-  temperature: 0.7
-  thinking: "high"
-  # 针对 OpenAI 兼容接口（如 SiliconFlow/OpenRouter）可配置 base_url
+  model: "Pro/deepseek-ai/DeepSeek-V3.2"
   base_url: "https://api.siliconflow.cn/v1"
+  api_key_env: "SiliconFlow_API_KEY"
+  temperature: 1
+  thinking: "high"
   max_new_factors: 15
   instructions_path: "./prompts/alpha_prompt_template.txt"
-  # api_key_env: "OPENAI_API_KEY"
-  api_key_env: "SiliconFlow_API_KEY"
+
+
   operator_whitelist:
     [
       "RANK",

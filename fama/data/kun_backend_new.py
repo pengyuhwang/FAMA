@@ -245,11 +245,18 @@ def compute_factor_values_kunquant_new(
         return empty, expr_list.copy()
 
     func = Function(builder.ops)
-    lib = cfake.compileit(
-        [("fama_graph_new", func, KunCompilerConfig(input_layout=layout, output_layout=layout))],
-        "fama_graph_new_lib",
-        cfake.CppCompilerConfig(),
-    )
+    try:
+        lib = cfake.compileit(
+            [("fama_graph_new", func, KunCompilerConfig(input_layout=layout, output_layout=layout))],
+            "fama_graph_new_lib",
+            cfake.CppCompilerConfig(),
+        )
+    except Exception as exc:
+        # 编译失败时整体回退
+        fallback_exprs.extend(compiled_exprs)
+        empty = pd.DataFrame(index=market_data.index)
+        empty.index.names = ["date", "symbol"]
+        return empty, fallback_exprs
     module = lib.getModule("fama_graph_new")
     executor = kr.createMultiThreadExecutor(max(1, int(threads)))
     first = next(iter(inputs_np.values()))

@@ -22,7 +22,7 @@ The CLI prints newly generated expressions. Pass `--output ./artifacts/run.yaml`
 ## Architecture
 | Stage | Location | Description |
 | ----- | -------- | ----------- |
-| Data / Compute | `fama/data/dataloader.py`, `fama/data/kun_backend.py` | `load_market_data` 规整 `(date, symbol)` MultiIndex；`available_factor_inputs` 抽取可用字段；`compute_factor_values` 优先走 KunQuant（TS 布局、多线程执行），KunQuant 失败或关闭时回退到 Python 解释器。 |
+| Data / Compute | `fama/data/dataloader.py`, `fama/data/kun_backend_new.py` | `load_market_data` 规整 `(date, symbol)` MultiIndex；`available_factor_inputs` 抽取可用字段；`compute_factor_values` 优先走 KunQuant 新后端（TS 布局、多线程执行），KunQuant 失败或关闭时回退到 Python 解释器。 |
 | CSS | `fama/css/cluster.py` | `cluster_factors_kmeans` (KMeans clustering) + `select_cross_samples` (randomly draw one factor per cluster, then down-sample to `css.n_select`). Hyperparameters `k` and `css.n_select` control the number of clusters and the count of chosen representatives. |
 | CoE | `fama/coe/manager.py` | `CoEManager` rebuilds γ-ranked experience chains from the latest clusters each run，优先读取 `factor_value_prepared/factor_ric.csv` 中的 RankIC（缺失时实时计算），按 RIC 绝对值从低到高构造经验链并遵守 `prompt_chains` / `max_depth`。 |
 | Prompting | `fama/mining/prompt_builder.py` | Reads `prompts/alpha_prompt_template.txt`, fills placeholders `{css_examples}`, `{coe_path}`, `{constraints}`, and parses LLM responses. |
@@ -30,11 +30,13 @@ The CLI prints newly generated expressions. Pass `--output ./artifacts/run.yaml`
 | LLM Client | `fama/mining/llm_client.py` | Replace `_fallback_generation` with your provider call. Until you do, a deterministic pseudo-response keeps tests/CLI working. |
 | CLI | `fama/cli.py` | One subcommand `mine` (with `--skip-css`, `--skip-coe`, `--output`). Uses `PromptOrchestrator` under the hood. |
 | Persistence | `fama/data/factor_space.py`, `fama/utils/io.py` | FactorSet serialized to YAML (`paths.factor_cache`). Config/outputs also rely on YAML helpers. |
+| LLM Workflow | `scripts/workflow_llm_factors.py` | 端到端 LLM 因子挖掘：调用 `fama/cli.py mine` 生成因子 → 仅计算本轮新因子值 → 计算 RIC → 与基库相关性筛选 → 追加到 `factor_cache`。支持迭代次数、RIC/相关性阈值等参数。 |
+| LLM Corr | `factor_correlation/compute_correlation.py` | 仅针对 LLM 因子内部计算 Spearman 相关性，输出矩阵及 |corr| 超阈值的因子对（默认读 `scripts/LLM_factors/dsl_LLM_factors_new.parquet`，阈值 0.6）。 |
 
 ## Data & Factors
 - **Production Parquet**：`data/fof_price_updating.parquet`（或自定义路径）会被自动映射成 `(date, symbol)` MultiIndex；若文件缺失，则退回到内置的 OHLCV 模拟器。`pyarrow` 已列在依赖里。
 - **Derived Series**：当 `close`/`volume` 存在时自动注入 `RET`、`VWAP`；字段可通过 `llm.deny_fields` 做黑名单控制。
-- **KunQuant Backend**：`fama/data/kun_backend.py` 将 `(T,N)` 布局输入喂给 KunQuant JIT，批量执行 Alpha；`compute.use_kunquant=false` 时自动回退到 Python 解释器。
+- **KunQuant Backend**：`fama/data/kun_backend_new.py` 将 `(T,N)` 布局输入喂给 KunQuant JIT，批量执行 Alpha；`compute.use_kunquant=false` 时自动回退到 Python 解释器。
 - **Expression DSL / Operators**：白名单覆盖 `RANK/DELTA/TS_MEAN/TS_STDDEV/CORREL/Z_SCORE/SIGN/ABS`，并由语义卡片 + 解析层双重限制，确保 LLM 不会输出未知算子或字段。
 - **Seed Library**：项目启动时自动解析 KunQuant `predefined.Alpha101` 中可用的符号（当前 82 条，`alpha001`~`alpha101` 之间的子集），并将其符号化表达写入 FactorCache；随后的因子计算完全依赖 KunQuant 的算子体系。
 
@@ -64,7 +66,7 @@ python -m alphatest.compute_alpha101_extfunction \
     --config fama/config/defaults.yaml \
     --output alphatest/factor_values_ext/alpha101_ext.csv
 ``` | 调用 `alphatest/ExtFunction.py`（KunQuant 预编译 Alpha101）在真实数据上产出官方基准因子值。 |
-| `python alphatest/FactorCollection_dsl.py` | 通过 `FactorCollectionDSL.update_dsl_factors()` 读取 `factor_cache`，将 DSL 表达式经 `fama/data/kun_backend.py` 解析为 KunQuant Ops 并计算因子值，默认写入 `alphatest/data/factors/dsl_factors.parquet`（或通过 `output_path` 改写）。该函数沿用 `FactorCollection` 已构建好的行情框架（`self.native_price` / `self.working_days`）。 |
+| `python alphatest/FactorCollection_dsl.py` | 通过 `FactorCollectionDSL.update_dsl_factors()` 读取 `factor_cache`，将 DSL 表达式经 `fama/data/kun_backend_new.py` 解析为 KunQuant Ops 并计算因子值，默认写入 `alphatest/data/factors/dsl_factors.parquet`（或通过 `output_path` 改写）。该函数沿用 `FactorCollection` 已构建好的行情框架（`self.native_price` / `self.working_days`）。 |
 
 这些脚本可与 `alphatest/data/factors/alpha101.parquet` 对比，帮助验证 DSL 解析与 KunQuant 官方实现的一致性。
 

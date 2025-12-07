@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import importlib
+import inspect
 import re
 from typing import Any, Callable, Dict, Iterable, List, Optional
 
@@ -138,6 +139,67 @@ def evaluate_expression(expr: str, context: dict[str, "pd.Series"]) -> "pd.Serie
 
     tree = ast.parse(expr, mode="eval")
     return _eval_node(tree.body, context)
+
+
+def validate_alpha_syntax_strict(
+    expr: str,
+    allowed_variables: Iterable[str] | None = None,
+    *,
+    allowed_ops: Optional[Iterable[str]] = None,
+) -> tuple[bool, str | None]:
+    """严格校验：白名单函数 + 变量 + 参数个数。
+
+    Returns:
+        (ok, reason) 其中 ok=False 时给出简短原因。
+    """
+
+    stripped = expr.strip()
+    if not stripped:
+        return False, "空表达式"
+    if _ALPHA_TOKEN.fullmatch(stripped):
+        return True, None
+
+    allowed_vars = set(_BASE_VARIABLES)
+    if allowed_variables:
+        allowed_vars.update(var.upper() for var in allowed_variables)
+    allowed_ops_set = {op.upper() for op in allowed_ops} if allowed_ops else None
+
+    try:
+        tree = ast.parse(expr, mode="eval")
+    except SyntaxError as exc:
+        return False, f"语法错误: {exc.msg}"
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant):
+            if isinstance(node.value, (int, float)):
+                continue
+            return False, "表达式为字符串/非数值常量"
+        if isinstance(node, ast.Name):
+            if node.id.upper() not in allowed_vars and node.id not in _ALLOWED_FUNCTIONS:
+                return False, f"未知变量或函数: {node.id}"
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            func_name = node.func.id.upper()
+            if allowed_ops_set is not None and func_name not in allowed_ops_set:
+                return False, f"函数不在白名单: {func_name}"
+            func = _ALLOWED_FUNCTIONS.get(func_name)
+            if func is None:
+                return False, f"不支持的函数: {func_name}"
+            sig = inspect.signature(func)
+            # 仅考虑位置参数数量（表达式中不使用 kwargs）
+            params = [
+                p
+                for p in sig.parameters.values()
+                if p.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+            ]
+            required = [p for p in params if p.default is inspect._empty]
+            min_args = len(required)
+            max_args = len(params)
+            argc = len(node.args)
+            if argc < min_args:
+                return False, f"{func_name} 参数不足: 需要 {min_args}, 实际 {argc}"
+            if argc > max_args:
+                return False, f"{func_name} 参数过多: 允许 {max_args}, 实际 {argc}"
+    return True, None
 
 
 def _eval_node(node: ast.AST, context: dict[str, "pd.Series"]) -> Any:
@@ -462,6 +524,72 @@ def _clip(series: "pd.Series", eps: float = 1.0) -> "pd.Series":
     return series.clip(lower=-eps, upper=eps)
 
 
+def _pow(series: "pd.Series", exponent: "pd.Series | float | int") -> "pd.Series":
+    return series ** exponent
+
+
+def _safe_div(
+    numerator: "pd.Series",
+    denominator: "pd.Series | float | int",
+    eps: float = 1e-4,
+    fill: float = 0.0,
+) -> "pd.Series":
+    denom = denominator
+    if isinstance(denom, (int, float)):
+        denom = float(denom)
+    denom_series = denominator if isinstance(denominator, pd.Series) else None
+    if denom_series is not None:
+        denom = denom_series.where(denom_series != 0, eps)
+    ratio = numerator / denom
+    return ratio.replace([np.inf, -np.inf], np.nan).fillna(fill)
+
+
+def _adv(series: "pd.Series", window: int) -> "pd.Series":
+    return _ts_mean(series, window)
+
+
+def _ema(series: "pd.Series", span: int) -> "pd.Series":
+    return series.groupby(level=1, group_keys=False).apply(
+        lambda s: s.ewm(span=span, min_periods=1, adjust=False).mean()
+    )
+
+
+def _ts_skew(series: "pd.Series", window: int) -> "pd.Series":
+    return series.groupby(level=1, group_keys=False).apply(
+        lambda s: s.rolling(window, min_periods=1).skew()
+    )
+
+
+def _ts_kurt(series: "pd.Series", window: int) -> "pd.Series":
+    return series.groupby(level=1, group_keys=False).apply(
+        lambda s: s.rolling(window, min_periods=1).kurt()
+    )
+
+
+def _fast_ts_sum(series: "pd.Series", window: int) -> "pd.Series":
+    return _ts_sum(series, window)
+
+
+def _ts_maxdrawdown(series: "pd.Series", window: int) -> "pd.Series":
+    def _max_dd(arr: np.ndarray) -> float:
+        if arr.size == 0:
+            return np.nan
+        cummax = np.maximum.accumulate(arr)
+        drawdown = arr / cummax - 1.0
+        return float(drawdown.min())
+
+    return series.groupby(level=1, group_keys=False).apply(
+        lambda s: s.rolling(window, min_periods=1).apply(_max_dd, raw=True)
+    )
+
+
+def _diff_with_weighted_sum(value: "pd.Series", weight: "pd.Series | float | int") -> "pd.Series":
+    w = weight if isinstance(weight, pd.Series) else pd.Series(weight, index=value.index)
+    weighted = value * w
+    cross_sum = weighted.groupby(level=0).transform("sum")
+    return value - cross_sum
+
+
 __all__ = [
     "parse_symbolic_expression",
     "list_seed_alphas",
@@ -490,7 +618,6 @@ _ALLOWED_FUNCTIONS: Dict[str, Callable[..., Any]] = {
     "TS_LINEAR_REGRESSION_SLOPE": _ts_linear_regression_slope,
     "CORREL": _correl,
     "COVAR": _covar,
-    "Z_SCORE": _z_score,
     "SIGN": _sign,
     "ABS": _abs,
     "DECAY_LINEAR": _decay_linear,
@@ -504,12 +631,22 @@ _ALLOWED_FUNCTIONS: Dict[str, Callable[..., Any]] = {
     "LT": _lt,
     "LE": _le,
     "EQ": _eq,
+    "POW": _pow,
     "MAX": _max_series,
     "MIN": _min_series,
     "LOG": _log,
     "EXP": _exp,
     "REPLACE_NAN_INF": _replace_nan_inf,
     "CLIP": _clip,
+    "SAFE_DIV": _safe_div,
+    "ADV": _adv,
+    "EMA": _ema,
+    "EXP_MOVING_AVG": _ema,
+    "FAST_TS_SUM": _fast_ts_sum,
+    "TS_KURT": _ts_kurt,
+    "TS_SKEW": _ts_skew,
+    "TS_MAXDRAWDOWN": _ts_maxdrawdown,
+    "DIFF_WITH_WEIGHTED_SUM": _diff_with_weighted_sum,
 }
 
 _BASE_VARIABLES = {

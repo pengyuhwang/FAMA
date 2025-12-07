@@ -52,6 +52,7 @@ def select_cross_samples(
     n_select: int,
     *,
     seed: int | None = None,
+    ric_scores: list[float] | None = None,
 ) -> list[int]:
     """执行论文中的随机化跨簇采样流程。
 
@@ -66,6 +67,22 @@ def select_cross_samples(
     for members in clusters:
         if not members:
             continue
+        if ric_scores is not None:
+            # 先按 RIC 值排序，截取簇内 RIC 最大的 Top3，再随机抽 1 个
+            scored = [(ric_scores[idx] if idx < len(ric_scores) else None, idx) for idx in members]
+            scored = [(s, i) for s, i in scored if s is not None]
+            if scored:
+                scored.sort(key=lambda x: x[0], reverse=True)
+                top = [i for _, i in scored[:3]]
+                picked = int(rng.choice(top))
+                if picked not in factor_combo:
+                    factor_combo.append(picked)
+                continue
+        # 原先的全随机逻辑（保留注释以便回滚）
+        # idx = int(rng.integers(0, len(members)))
+        # picked = members[idx]
+        # if picked not in factor_combo:
+        #     factor_combo.append(picked)
         idx = int(rng.integers(0, len(members)))
         picked = members[idx]
         if picked not in factor_combo:

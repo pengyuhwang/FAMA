@@ -63,6 +63,23 @@ class EfficientCalculator:
             arr = arr.to_numpy()
         return _bin_equal_width(arr, bins)
 
+    def efficient_cal_ic_std(self, x, y, method="pearson", handle_nan=True):
+        """用留一法 (jackknife) 粗估 IC 的标准差；不足 3 个样本返回 NaN。"""
+        x_vals = x.values if isinstance(x, pd.Series) else np.asarray(x)
+        y_vals = y.values if isinstance(y, pd.Series) else np.asarray(y)
+        if handle_nan:
+            mask = ~(np.isnan(x_vals) | np.isnan(y_vals))
+            x_vals, y_vals = x_vals[mask], y_vals[mask]
+        n = len(x_vals)
+        if n < 3:
+            return np.nan
+        corrs = []
+        for i in range(n):
+            xi = np.delete(x_vals, i)
+            yi = np.delete(y_vals, i)
+            corrs.append(_calculate_correlation_numba(xi, yi, method, False))
+        return np.nanstd(corrs, ddof=1)
+
 
 @numba.jit(nopython=True)
 def _bin_equal_width(arr, bins):

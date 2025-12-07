@@ -20,7 +20,12 @@ from fama.data.dataloader import (
 )
 from fama.data.factor_space import Factor, FactorSet, deserialize_factor_set, serialize_factor_set
 from fama.factors.alpha101_extractor import extract_alpha101_expressions
-from fama.factors.alpha_lib import list_alpha101_tokens, list_seed_alphas, validate_alpha_syntax
+from fama.factors.alpha_lib import (
+    list_alpha101_tokens,
+    list_seed_alphas,
+    validate_alpha_syntax,
+    validate_alpha_syntax_strict,
+)
 from fama.mining import prompt_builder
 from fama.mining.llm_client import request_new_factors
 from fama.coe.manager import CoEManager
@@ -48,9 +53,17 @@ class PromptOrchestrator:
         self.coe_cfg = cfg.get("coe", {})
         deny_fields = {field.upper() for field in self.llm_cfg.get("deny_fields", [])}
         self.available_fields = available_factor_inputs(self.market_data)
+        # Ensure AMOUNT is kept if present in data but missed by dtype checks
+        if "AMOUNT" not in self.available_fields and any(c.lower() == "amount" for c in self.market_data.columns):
+            self.available_fields.append("AMOUNT")
+            self.available_fields.sort()
         if not self.available_fields:
             raise ValueError("未检测到可用的数值字段，无法构建因子。")
-        self.prompt_allowed_fields = sorted([f for f in self.available_fields if f not in deny_fields]) or self.available_fields
+        prompt_fields = sorted([f for f in self.available_fields if f not in deny_fields]) or self.available_fields
+        if "AMOUNT" not in prompt_fields and "AMOUNT" in self.available_fields:
+            prompt_fields.append("AMOUNT")
+            prompt_fields.sort()
+        self.prompt_allowed_fields = prompt_fields
         self.allowed_variables = set(self.prompt_allowed_fields)
         self.allowed_ops = set(op.upper() for op in self.llm_cfg.get("operator_whitelist", []))
         self.logger.info("可用字段: %s", ", ".join(self.available_fields))
@@ -135,8 +148,20 @@ class PromptOrchestrator:
         css_cfg = self.cfg.get("css", {})
         n_select = css_cfg.get("n_select", 16)
         seed = css_cfg.get("seed")
+        # 根据预计算 RIC 构建得分向量（按 factor 顺序对齐）
+        ric_scores = None
+        precomputed_ric = getattr(self.coe_manager, "_precomputed_ric", None)
+        if precomputed_ric is not None:
+            ric_map = (
+                precomputed_ric.groupby("factor_tag")["ric"].max()
+                if "factor_tag" in precomputed_ric.columns
+                else None
+            )
+            if ric_map is not None:
+                ric_scores = [ric_map.get(factor.name) for factor in factors.factors]
+
         self.logger.info("CSS selecting %d diversified context samples", n_select)
-        selections = select_cross_samples(clusters, n_select, seed=seed)
+        selections = select_cross_samples(clusters, n_select, seed=seed, ric_scores=ric_scores)
         self.logger.info("CSS selected factor indices: %s", selections)
         if clusters:
             self._execute_factor_metrics_scripts()
@@ -317,12 +342,13 @@ class PromptOrchestrator:
         for item in expressions:
             expr = (item.get("expression") if isinstance(item, dict) else None) or ""
             expr = expr.strip()
-            if not validate_alpha_syntax(
+            ok, reason = validate_alpha_syntax_strict(
                 expr,
                 self.allowed_variables,
                 allowed_ops=self.allowed_ops,
-            ):
-                self.logger.warning("Skipping invalid expression: %s", expr)
+            )
+            if not ok:
+                self.logger.warning("Skipping invalid expression: %s，原因: %s", expr, reason)
                 continue
             counter += 1
             while counter in used_suffixes:
@@ -339,11 +365,11 @@ class PromptOrchestrator:
             accepted_factors.append(factor_obj)
         if accepted_factors:
             serialize_factor_set(self.llm_factor_set, str(self.llm_factor_repo))
-        self.factor_frame = compute_factor_values(
-            self.market_data,
-            [factor.expression for factor in self.factor_set.factors],
-            cfg=self.cfg,
-        )
+        # self.factor_frame = compute_factor_values(
+        #     self.market_data,
+        #     [factor.expression for factor in self.factor_set.factors],
+        #     cfg=self.cfg,
+        # )
         if accepted_factors:
             self._persist_factor_series(accepted_factors)
 
@@ -361,15 +387,18 @@ class PromptOrchestrator:
 
     def _sanitize_factor_sets(self) -> None:
         def _sanitize(factors: list[Factor]) -> list[Factor]:
-            return [
-                factor
-                for factor in factors
-                if validate_alpha_syntax(
+            cleaned = []
+            for factor in factors:
+                ok, reason = validate_alpha_syntax_strict(
                     factor.expression,
                     self.allowed_variables,
                     allowed_ops=None,
                 )
-            ]
+                if ok:
+                    cleaned.append(factor)
+                else:
+                    self.logger.warning("移除不兼容表达式: %s，原因: %s", factor.expression, reason)
+            return cleaned
 
         base_valid = _sanitize(self.factor_set.factors)
         if len(base_valid) != len(self.factor_set.factors):
@@ -390,38 +419,8 @@ class PromptOrchestrator:
         serialize_factor_set(self.llm_factor_set, str(self.llm_factor_repo))
 
     def _persist_factor_series(self, factors: list[Factor]) -> None:
-        if not factors:
-            return
-        expressions = [factor.expression for factor in factors]
-        try:
-            df = compute_factor_values(self.market_data, expressions, cfg=self.cfg)
-        except Exception as exc:
-            self.logger.warning("因子数值计算失败，未写入文件：%s", exc)
-            return
-        if df.empty:
-            self.logger.info("因子计算结果为空，跳过持久化。")
-            return
-        rows = []
-        for factor in factors:
-            expr = factor.expression
-            if expr not in df.columns:
-                self.logger.warning("表达式 %s 未生成数据，跳过写入。", expr)
-                continue
-            series = df[expr].rename("value").reset_index()
-            series = series.rename(columns={"date": "time", "symbol": "unique_id"})
-            series["factor_tag"] = factor.name
-            rows.append(series)
-        if not rows:
-            return
-        merged = pd.concat(rows, ignore_index=True)[["time", "unique_id", "factor_tag", "value"]]
-        out_path = self.factor_output_dir / "llm_factors.csv"
-        ensure_dir(str(out_path.parent))
-        if out_path.exists():
-            merged_prev = pd.read_csv(out_path)
-            merged = pd.concat([merged_prev, merged], ignore_index=True)
-        merged.sort_values(["time", "unique_id", "factor_tag"], inplace=True)
-        merged.to_csv(out_path, index=False)
-        self.logger.info("LLM 因子写入 %s（新增 %d 条）。", out_path, len(rows))
+        # 已禁用 CSV 持久化，避免重复存储。如需启用，请恢复原实现。
+        return
 
     def _compute_forward_returns(self, market_data: pd.DataFrame) -> pd.Series | None:
         if "close" not in market_data.columns:

@@ -32,5 +32,6 @@ alphatest/ts_ic_alpha101_1.csv
 scripts
 
 RankIC/factor_ric.csv
+RankIC/factor_rolling_ric.csv
 
 data/factor_values/llm_factors.csv
